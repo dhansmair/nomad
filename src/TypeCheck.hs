@@ -1,5 +1,4 @@
 {-
-Author: David Hansmair
 this Module exports the function 'getType', which determines the type for a 
 given expression.
 

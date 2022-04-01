@@ -1,6 +1,4 @@
 {-
-Author: David Hansmair
-
 this module exports only the evaluate function, and also the alphaRename
 helper function, which needs to be done once in cli.hs, before the typeCheck 
 can be performed.

@@ -30,7 +30,6 @@ library
       Environment
       Interpreter
       Lexer
-      Lib
       MyParser
       Simplification
       TypeCheck
@@ -50,7 +49,6 @@ library
 executable cli
   main-is: cli.hs
   other-modules:
-      Main
       Paths_nomad
   hs-source-dirs:
       app

@@ -1,5 +1,4 @@
 {-
-Author: David Hansmair
 Contains the lexer function and the 'Token' data type.
 lexer function is inspired by the example in the happy parser documentation.
 -}

@@ -1,6 +1,4 @@
 {-
-Author: David, Georg
-
 The main command line interface for the application.
 
 Defines the main and loop functions, which handle the main transformer stack. 

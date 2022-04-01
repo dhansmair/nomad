@@ -1,5 +1,4 @@
 {
--- Author: David Hansmair
 -- MyParser.hs is automatically generated from MyParser.y using the happy parser generator.
 
 -- Description for MyParser.y:

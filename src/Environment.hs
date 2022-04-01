@@ -1,6 +1,4 @@
 {-
-Author: Georg
-
 This module exports the environment, a state transformer storing the environment and a number of monadic actions.
 
 The environment Env contains a list of environment definitions EnvDef, tuples containing the name, expression, type and dependencies of definitions.

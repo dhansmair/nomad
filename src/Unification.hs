@@ -1,6 +1,4 @@
 {-
-Author: David Hansmair
-
 this module provides the functions unify and calcUnifier.
 -}
 

@@ -1,5 +1,4 @@
 {-
-Author: David, Georg
 This module contains most of the type definitions used across our code, 
 that are required in multiple places.
 It has no dependencies to other modules, which is convenient because it can
