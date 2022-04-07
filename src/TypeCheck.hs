@@ -38,7 +38,8 @@ import Data.Maybe ( mapMaybe )
 import Data.List ( intercalate )
 
 import Definitions
-import Unification (unify, calcUnifier)
+import Utils ( makeApp )
+import Unification ( unify, calcUnifier )
 
 type TypeAssumption = (String, Type)
 type MyState = ([TypeAssumption], [String], [TypeEquation])
@@ -144,7 +145,7 @@ getTypeM (Num x) = return TNum
 
 -- transform binary operators into applications of supercombinators.
 -- the type (which is always num -> num -> num) is then looked up in gamma
-getTypeM (BinOp op a b) = getTypeM (App (Var (op2name op)) [a, b])
+getTypeM (BinOp op a b) = getTypeM (makeApp (Var (op2name op)) [a, b])
     where
         op2name :: Op -> String
         op2name Add = "#add"
@@ -154,36 +155,20 @@ getTypeM (BinOp op a b) = getTypeM (App (Var (op2name op)) [a, b])
         op2name Pow = "#pow"
 
 -- RAbs: rule for abstractions
-getTypeM (Abs ids ex) = do
-    newTypeVars <- getNames (length ids)
-    mapM_ addGamma $ zip ids newTypeVars
+getTypeM (Abs s ex) = do
+    newTypeVar <- getName
+    addGamma (s,  newTypeVar)
     t <- getTypeM ex
-    return $ TComb $ newTypeVars ++ [t]
+    return $ TComb [newTypeVar, t]
 
--- RApp: rule for application (1/3)
--- For the typing, applications with multiple arguments are decomposed into 
--- multiple partial applications. 
-getTypeM (App ex (a:b:args)) = getTypeM $ transformApp ex (a:b:args)
-    where
-        transformApp :: Expr -> [Expr] -> Expr
-        transformApp s [] = s
-        transformApp s (a:args) = transformApp (App s [a]) args
-
--- RApp: rule for application (2/3)
--- After decomposition, each App has only one argument, and the simple RApp rule 
--- from the lecture can be used.
-getTypeM (App s [t]) = do
+-- RApp: rule for application
+getTypeM (App s t) = do
     tau1 <- getTypeM s 
     tau2 <- getTypeM t
     alpha <- getName
     addEquation (tau1, TComb [tau2, alpha]) 
     return alpha
 
-
--- RApp: rule for application (3/3)
--- this special case occurs when a function is invoked without arguments.
--- e.g., f() has the type of f
-getTypeM (App s []) = getTypeM s
 
 -- this case should not happen, because the types of all builtins are in gamma0
 -- and thus simpliy looked up

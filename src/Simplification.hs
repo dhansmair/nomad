@@ -44,7 +44,7 @@ simplify (BinOp Pow a b) =
 
 simplify (Abs params ex) = Abs params $ simplify ex
 
-simplify (App (Var "ln") [Var "e"]) = Num 1
+simplify (App (Var "ln") (Var "e")) = Num 1
 
 simplify other = other
 

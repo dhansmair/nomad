@@ -24,10 +24,11 @@
 
 
 
-module MyParser( parse ) where
+module NomadParser( parse ) where
 
-import Control.Monad.Trans.Except( ExceptT, throwE )
 import Lexer ( lexer, Token(..) )
+import Utils ( makeApp, makeAbs )
+import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
 import Definitions ( Stmt(..), Expr(..), Op(..), MyError(..), MyException )
 
 }
@@ -59,13 +60,13 @@ IdFunc  : id '(' ')'            { IdFunc $1 [] }
         | id '(' IdList ')'     { IdFunc $1 (reverse $3) }
 
 App     : IdFunc                        { idFunc2App $1 } 
-        | id '(' List ')'               { App (Var $1) (reverse $3) } 
-        | App '(' List ')'              { App $1 (reverse $3) }
-        | App '(' IdList ')'            { App $1 (idlist2list (reverse $3)) }
-        | '(' Expr2 ')' '(' List ')'    { App $2 (reverse $5) }
-        | '(' Expr2 ')' '(' IdList ')'  { App $2 (idlist2list (reverse $5)) }
+        | id '(' List ')'               { makeApp (Var $1) (reverse $3) } 
+        | App '(' List ')'              { makeApp $1 (reverse $3) }
+        | App '(' IdList ')'            { makeApp $1 (idlist2list (reverse $3)) }
+        | '(' Expr2 ')' '(' List ')'    { makeApp $2 (reverse $5) }
+        | '(' Expr2 ')' '(' IdList ')'  { makeApp $2 (idlist2list (reverse $5)) }
 
-Abs     : lam IdList '->' Expr2         { Abs (reverse $2) $4 }
+Abs     : lam IdList '->' Expr2         { makeAbs (reverse $2) $4 }
 
 List    : Expr2N                { [$1] }
         | List ',' Expr2        { $3 : $1 }
@@ -128,10 +129,17 @@ idlist2list [] = []
 idlist2list (x:xs) = (Var x) : (idlist2list xs)
 
 idFunc2App :: IdFunc -> Expr 
-idFunc2App (IdFunc i idList) = App (Var i) (idlist2list idList)
+idFunc2App (IdFunc i idList) = makeApp (Var i) (idlist2list idList)
 
 makeDef :: IdFunc -> Expr -> Stmt 
-makeDef (IdFunc s idList) ex = Def s (Abs idList ex)
+makeDef (IdFunc s idList) ex = Def s (makeAbs idList ex)
+
+
+
+parse' :: String -> Either MyError Stmt
+parse' s = do
+    res <- runExceptT $ parse s
+    res
 
 
 

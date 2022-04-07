@@ -37,24 +37,29 @@ evaluate (BinOp op e1 e2) = do
     n2 <- evaluate e2
     exceptify $ applyBinOp op n1 n2
 
-evaluate (Abs [] ex) = evaluate ex
-evaluate (Abs ps ex) = return $ Abs ps ex
+evaluate (Abs s ex) = return $ Abs s ex
 
 evaluate (Builtin b) = return $ Builtin b
-evaluate (App ex []) = evaluate ex
+evaluate (App s t) = do
+    s' <- evaluate s
+    case s' of 
+        Builtin b -> do
+            t' <- evaluate t
 
-evaluate (App ex (a:args)) = do
-    f <- evaluate ex
-    case f of 
-        Builtin (B _ f') -> do
-            -- evaluate builtin function
-            -- no partial application possible
-            results <- mapM evaluate (a:args)
-            exceptify $ f' results
+            if length (args b) == narg b - 1 then do
+                -- apply the function
+                let args' = reverse (t' : args b)  
+                exceptify $ func b args'
+            else if length (args b) < narg b then do
+                -- return a new builtin, but add the 
+                return $ Builtin $ b {args=t':args b}
+            else do
+                error "error in builtins, should not happen"
+
         _ -> do
-            a' <- evaluate a
-            f' <- betaReduce (alphaRename f) a'
-            evaluate (App f' args)
+            t' <- evaluate t
+            app' <- betaReduce (alphaRename s') t'
+            evaluate app'
 
 -- helper function which unwraps an either value or throws an exception
 exceptify :: Monad m => Either MyError Expr -> MyException m Expr
@@ -67,24 +72,26 @@ exceptify eith = case eith of
 -- the RuntimeError would normally not occur here, this should already be cought 
 -- by the type system
 betaReduce :: Monad m =>  Expr -> Expr -> MyException m Expr
-betaReduce (Abs (p:ps) ex) arg = return $ Abs ps (replaceWith arg p ex)
+betaReduce (Abs p ex) arg = return $ replaceWith arg p ex
 betaReduce other arg = throwE $ RuntimeError "Left side of application is not an abstraction"
 
 -- replaceWith obj -> matcher -> body
 replaceWith :: Expr -> String -> Expr -> Expr
 replaceWith arg s (Num n) = Num n
 replaceWith arg s (Var x) = if x == s then arg else Var x
-replaceWith arg s (BinOp op e1 e2) = BinOp op (replaceWith arg s e1) (replaceWith arg s e2)
+replaceWith arg s (BinOp op a b) = 
+    let a' = replaceWith arg s a
+        b' = replaceWith arg s b
+     in BinOp op a' b'
 replaceWith arg s (Builtin b) = Builtin b
-
-replaceWith arg s (App ex args) = do 
-    let ex' = replaceWith arg s ex
-        args' = map (replaceWith arg s) args
-     in App ex' args'
+replaceWith arg s (App a b) = 
+    let a' = replaceWith arg s a
+        b' = replaceWith arg s b
+     in App a' b'
 
 -- important: need to make sure s is not in params, should be the case
 -- because of previous alpha-renaming
-replaceWith arg s (Abs params ex) = Abs params (replaceWith arg s ex) 
+replaceWith arg s (Abs p ex) = Abs p (replaceWith arg s ex) 
 
 
 alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
@@ -104,23 +111,18 @@ alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
             a' <- alphaRenameM a
             b' <- alphaRenameM b
             return $ BinOp op a' b'
-        alphaRenameM (App ex args) = do
-            ex' <- alphaRenameM ex
-            args' <- mapM alphaRenameM args
-            return $ App ex' args'
-        alphaRenameM (Abs params ex) = do
+        alphaRenameM (App s t) = do
+            s' <- alphaRenameM s
+            t' <- alphaRenameM t
+            return $ App s' t'
+        alphaRenameM (Abs s ex) = do
             (renamings, freshvars) <- get
-            let n = length params
-                newNames = take n freshvars
-                restvars = drop n freshvars
-                rens = zip params newNames
-            put (reverse rens ++ renamings, restvars)
+            let s' = head freshvars
+                restvars = tail freshvars
+            put ((s,s'):renamings, restvars)
             ex' <- alphaRenameM ex
-
-            -- important!!! remove rens again from the state after finishing
-            -- this alphaRenameM call
-            put (renamings, restvars)
-            return $ Abs newNames ex' 
+            put (renamings, restvars) 
+            return $ Abs s' ex'
         alphaRenameM (Builtin b) = return $ Builtin b
 
 
@@ -146,25 +148,30 @@ alphaRename ex = evalState (ren ex) ([], [], names)
             a' <- ren a
             b' <- ren b
             return $ BinOp op a' b'
-        ren (App ex args) = do
-            ex' <- ren ex
-            args' <- mapM ren args
-            return $ App ex' args'
+        ren (App s t) = do
+            s' <- ren s
+            t' <- ren t
+            return $ App s' t'
 
-        ren (Abs params ex) = do
-            (_, renamings, _) <- get
+        ren (Abs s ex) = do
+            (visited, renamings, nl) <- get
 
-            -- for every param, check if in visited, if not add, 
-            -- but if yes, fetch a new name and introduce a renaming.
-            -- however, the same number of renamings must be popped afterwards.
-            params' <- mapM checkVar params
-            ex' <- ren ex
-            (visited', _, nl') <- get
-            put (visited', renamings, nl')
-            return $ Abs params' ex'
+            if s `elem` visited then do
+                -- introduce a new renaming
+                let s' = head nl
+                    nl' = tail nl
+                put (visited, (s,s'):renamings, nl')
+                ex' <- ren ex
+                -- but pop it afterwards TODO is this necessary?
+                put (visited, renamings, nl')
 
-        -- ren (Builtin b) = return $ Builtin b
-        -- ren (Num n) = return $ Num n
+                return $ Abs s' ex'
+
+            else do
+                put (s:visited, renamings, nl)
+                ex' <- ren ex
+                return $ Abs s ex'
+
         ren other = return other
 
         checkVar :: String -> State ARState String

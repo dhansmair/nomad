@@ -4,11 +4,15 @@
 
 module Builtins ( stdEnv ) where
 
+
 import Definitions
 import Environment
 import Debug.Trace
+import Utils ( makeApp, makeAbs)
 import Simplification (simplify)
 
+
+type BuiltinFunc = [Expr] -> Either MyError Expr
 
 nanMsg = Left $ RuntimeError "builtin function requires input of type Num"
 numArgMsg = Left $ RuntimeError "wrong number of arguments to [builtin]"
@@ -52,30 +56,30 @@ stdEnv =
 
 -- builtin functions
 --
-idB = Abs ["x"] (Var "x")
-addB = makeExpr "add" $ makeBinary (+)
-subB = makeExpr "sub" $ makeBinary (-)
-mulB = makeExpr "mul" $ makeBinary (*)
-divB = makeExpr "div" $ makeBinary (/)
-powB = makeExpr "pow" $ makeBinary (**)
+idB = Abs "x" (Var "x")
+addB = makeBinary "add" (+)
+subB = makeBinary "sub" (-)
+mulB = makeBinary "mul" (*)
+divB = makeBinary "div" (/)
+powB = makeBinary "pow" (**)
 
-sinB = makeExpr "sin" $ makeUnary sin
-cosB = makeExpr "cos" $ makeUnary cos 
-tanB = makeExpr "tan" $ makeUnary tan
-expB = makeExpr "exp" $ makeUnary exp
-lnB  = makeExpr "ln"  $ makeUnary log
-logB = makeExpr "log" $ makeBinary logBase
-absB = makeExpr "abs" $ makeUnary abs
-maxB = makeExpr "max" $ makeBinary max
+absB = makeUnary "abs" abs
+sinB = makeUnary "sin" sin
+cosB = makeUnary "cos" cos
+tanB = makeUnary "tan" tan
+expB = makeUnary "exp" exp
+lnB  = makeUnary "ln"  log
+logB = makeBinary "log" logBase
+maxB = makeBinary "max" max
 
-rootB = Abs ["n", "x"] (BinOp Pow (Var "x") (BinOp Div (Num 1) (Var "n")))
-sqrtB = Abs ["x"] (BinOp Pow (Var "x") (Num 0.5))
+rootB = makeAbs ["n", "x"] (BinOp Pow (Var "x") (BinOp Div (Num 1) (Var "n")))
+sqrtB = makeAbs ["x"] (BinOp Pow (Var "x") (Num 0.5))
 
-deriveB = Builtin $ B "derive" deriveB'
+deriveB = Builtin $ B {name="derive", narg=1, func=deriveB', args=[]}
     where 
         deriveB' :: [Expr] -> Either MyError Expr
-        deriveB' [Abs [x] ex] = Right $ Abs [x] $ simplify $ deriveBy ex x
-        deriveB' [Builtin (B name _)] = Right $ simplify $ deriveBy (Var name) "x"
+        deriveB' [Abs [x] ex] = Right $ Abs [x] $ simplify $ deriveBy ex [x]
+        deriveB' [Builtin b] = Right $ simplify $ deriveBy (Var (name b)) "x"
         deriveB' list = Left $ RuntimeError $ "cannot derive " ++ show list
 
 (#+) = BinOp Add 
@@ -93,42 +97,50 @@ deriveBy (BinOp Mul u v) s = (deriveBy u s #* v) #+ (u #* deriveBy v s)
 deriveBy (BinOp Div u v) s = ((deriveBy u s #* v) #- (u #* deriveBy v s)) #/ (v #^ Num 2)
 deriveBy (BinOp Pow f g) s = (f #^ g) #* (l #+ r)
     where
-        l = deriveBy g s #* App (Var "ln") [f]
+        l = deriveBy g s #* App (Var "ln") f
         r = deriveBy f s #* (g #/ f)
 
 deriveBy (Var "sin") _ = cosB
-deriveBy (Var "cos") _ = Abs ["x"] $ Num (-1) #* App (Var "sin") [Var "x"]
-deriveBy (Var "tan") _ = Abs ["x"] $ Num 1 #/ App (Var "cos") [Var "x"] #^ Num 2
-deriveBy (Var "ln" ) _ = Abs ["x"] $ Num 1 #/ Var "x"
+deriveBy (Var "cos") _ = Abs "x" $ Num (-1) #* App (Var "sin") (Var "x")
+deriveBy (Var "tan") _ = Abs "x" $ Num 1 #/ App (Var "cos") (Var "x") #^ Num 2
+deriveBy (Var "ln" ) _ = Abs "x" $ Num 1 #/ Var "x"
 deriveBy (Var "exp") _ = expB
+deriveBy (Var "abs") _ = error "cannot derive abs"
+deriveBy (Var "max") _ = error "cannot derive max"
+
 deriveBy (Var x)     s = if x == s then Num 1 else Num 0
 
 -- chain rule, nachdifferenzieren
 -- deriveBy (App (Var f) [x]) s = App (deriveBy (Var f) s) [x] #* deriveBy x s
 -- lazy evaluation
-deriveBy (App (Var f) [x]) s = App (App (Var "derive") [Var f]) [x] #* deriveBy x s
+deriveBy (App (Var f) x) s = App (App (Var "derive") (Var f)) x #* deriveBy x s
 
 deriveBy ex s = error $ "cannot derive " ++ show ex 
 
 
 -- some helper functions
 --
+makeUnary :: String -> (Double -> Double) -> Expr
+makeUnary s f = Builtin $ B {name=s, narg=1, args=[], func=makeUnary' f}
+    where
+        makeUnary' :: (Double -> Double) -> BuiltinFunc
+        makeUnary' f [Num x] = Right $ Num (f x)
+        makeUnary' f [_] = nanMsg
+        makeUnary' f _ = numArgMsg
 
-makeExpr :: String -> ([Expr] -> Either MyError Expr) -> Expr
-makeExpr s f = Builtin $ B s f
+makeBinary :: String -> (Double -> Double -> Double) -> Expr
+makeBinary s f = Builtin $ B {name=s, narg=2, args=[], func=makeBinary' f}
+    where
+        makeBinary' :: (Double -> Double -> Double) -> BuiltinFunc
+        makeBinary' f [Num a, Num b] = Right $ Num (f a b) 
+        makeBinary' f [_, _] = nanMsg
+        makeBinary' f _ = numArgMsg
 
-makeUnary :: (Double -> Double) -> [Expr] -> Either MyError Expr
-makeUnary f [Num x] = Right $ Num (f x)
-makeUnary f [_] = nanMsg
-makeUnary f _ = numArgMsg
-
-makeBinary :: (Double -> Double -> Double) -> [Expr] -> Either MyError Expr
-makeBinary f [Num a, Num b] = Right $ Num (f a b) 
-makeBinary f [_, _] = nanMsg
-makeBinary f _ = numArgMsg
-
-makeTernary :: (Double -> Double -> Double -> Double) -> [Expr] -> Either MyError Expr
-makeTernary f [Num a, Num b, Num c] = Right $ Num (f a b c) 
-makeTernary f [_, _, _] = nanMsg
-makeTernary f _ = numArgMsg
+makeTernary :: String -> (Double -> Double -> Double -> Double) -> Expr
+makeTernary s f = Builtin $ B {name=s, narg=3, args=[], func=makeTernary' f}
+    where
+        makeTernary' :: (Double -> Double -> Double -> Double) -> BuiltinFunc
+        makeTernary' f [Num a, Num b, Num c] = Right $ Num (f a b c) 
+        makeTernary' f [_, _, _] = nanMsg
+        makeTernary' f _ = numArgMsg
 

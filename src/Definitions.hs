@@ -42,8 +42,8 @@ data Stmt = Def String Expr
 data Expr = Num Double
           | Var String
           | BinOp Op Expr Expr
-          | App Expr [Expr] 
-          | Abs [String] Expr
+          | App Expr Expr 
+          | Abs String Expr
           | Builtin Builtin 
           deriving(Show)
 
@@ -52,10 +52,20 @@ data Op = Add | Sub | Mul | Div | Pow
 
 -- Buitin is a special type for Expr, which is used to provide a bridge between
 -- our simple language and builtin functions
-data Builtin = B String ([Expr] -> Either MyError Expr)
+-- data Builtin = B String ([Expr] -> Either MyError Expr)
 
+-- instance Show Builtin where
+--     show (B s _) = s
+--
+data Builtin = B { narg :: Int
+                 , args :: [Expr]
+                 , func :: [Expr] -> Either MyError Expr
+                 , name :: String
+                 }
 instance Show Builtin where
-    show (B s _) = s
+    show (B n args f name) = name
+
+
 
 
 instance Eq Expr where
@@ -64,7 +74,7 @@ instance Eq Expr where
     (==) (BinOp op1 a1 b1) (BinOp op2 a2 b2) = op1 == op2 && a1 == a2 && b1 == b2
     (==) (App ex1 l1) (App ex2 l2) = ex1 == ex2 && l1 == l2
     (==) (Abs l1 ex1) (Abs l2 ex2) = False
-    (==) (Builtin (B name1 _)) (Builtin (B name2 _)) = name1 == name2
+    (==) (Builtin b1) (Builtin b2) = name b1 == name b2
     (==) _ _ = False
     
 
@@ -80,10 +90,11 @@ instance ShowEx Expr where
     showEx (Num d) = show d
     showEx (Var s) = s
     showEx (BinOp op a b) = "(" ++ showEx a ++ " " ++ showEx op ++ " " ++ showEx b ++ ")"
-    showEx (App (Var s) exprs) = s ++ "(" ++ pPrintList exprs ++ ")"
-    showEx (App ex exprs) = "(" ++ showEx ex ++ ")(" ++ pPrintList exprs ++ ")"
-    showEx (Abs ids ex) = '\\' : intercalate ", " ids ++ " -> " ++ showEx ex
-    showEx (Builtin (B name _)) = name
+    -- showEx (App (Var s) exprs) = s ++ "(" ++ pPrintList exprs ++ ")"
+    showEx (App (Var s) ex) = s ++ "(" ++ showEx ex ++ ")"
+    showEx (App s t) = "(" ++ showEx s ++ ")(" ++ showEx t ++ ")"
+    showEx (Abs x ex) = '\\' : x ++ " -> " ++ showEx ex
+    showEx (Builtin b) = name b
 
 instance ShowEx Op where
     showEx Add = "+"

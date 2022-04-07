@@ -13,7 +13,7 @@ import Control.Monad.Trans.Except
 import Data.List
 
 import Interpreter ( evaluate, alphaRename )
-import MyParser (parse)
+import NomadParser ( parse )
 import Builtins (stdEnv)
 import TypeCheck ( getType, getTypeEither )
 import Definitions

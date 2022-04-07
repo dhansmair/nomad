@@ -35,7 +35,7 @@ instance Ord Reach where
 
 -- A node on the dependency graph
 data DepGraphNode = DependencyGraphNode
-    { name :: String
+    { dgName :: String
     , expr :: Expr
     , deps :: [String]
     , indDeps :: [String]
@@ -101,8 +101,9 @@ getDeps (Builtin _) = []
 getDeps (Num _) = []
 getDeps (Var s) = [s]
 getDeps (BinOp _ a b) = getDeps a `union` getDeps b
-getDeps (Abs ns ex) = (\\) (getDeps ex) ns
-getDeps (App a bs) = foldl union (getDeps a) (map getDeps bs) --not sure about this one (seems to work though)
+getDeps (Abs ns ex) = (\\) (getDeps ex) [ns]
+getDeps (App a bs) = foldl union (getDeps a) (map getDeps [bs]) 
+--not sure about this one (seems to work though)
 
 --
 getTypeDefs :: Env -> [(String, Type)]
@@ -122,7 +123,7 @@ getMaxReach [] m = m
 -- calculates reach from one node to all nodes in dependencyGraph
 calcReachGraph :: [DepGraphNode] -> [String] -> [DepGraphNode]
 calcReachGraph dg (x : xs) = do
-    let xNode = head (filter (\dgn -> name dgn == x) dg) -- TODO (Georg): this could be more elegant
+    let xNode = head (filter (\dgn -> dgName dgn == x) dg) -- TODO (Georg): this could be more elegant
     let (dg', addAccs) = unzip (map (`calcReachGraphNode` xNode) dg)
     calcReachGraph dg' (xs `union` catMaybes addAccs)
 calcReachGraph dg [] = dg
@@ -130,10 +131,10 @@ calcReachGraph dg [] = dg
 -- progresses reach from one node to another
 calcReachGraphNode :: DepGraphNode -> DepGraphNode -> (DepGraphNode, Maybe String)
 calcReachGraphNode a x
-    | name x `notElem` deps a = (a, Nothing)
+    | dgName x `notElem` deps a = (a, Nothing)
     | reach a >= incReach (reach x) = (a, Nothing)
-    | name a `elem` indDeps x = (a{reach = CyclicDependencies}, Just (name a))
-    | otherwise = (a{reach = incReach (reach x), indDeps = indDeps a `union` indDeps x}, Just (name a))
+    | dgName a `elem` indDeps x = (a{reach = CyclicDependencies}, Just (dgName a))
+    | otherwise = (a{reach = incReach (reach x), indDeps = indDeps a `union` indDeps x}, Just (dgName a))
   where
     incReach (ReachAt n) = ReachAt (n + 1)
     incReach r = r
@@ -156,7 +157,7 @@ reevalNode env l dgn
 depGraphToEnv :: [DepGraphNode] -> Env
 depGraphToEnv = map depGraphNodeToDef
   where
-    depGraphNodeToDef dgn = (name dgn, expr dgn, typ dgn, deps dgn)
+    depGraphNodeToDef dgn = (dgName dgn, expr dgn, typ dgn, deps dgn)
 
 -- converts the environment to a dependency graph
 envToDepGraph :: Env -> String -> [DepGraphNode]
@@ -164,7 +165,7 @@ envToDepGraph env s = map (initDGN s) env
   where
     initDGN nam (s, ex, t, dep) =
             DependencyGraphNode
-                { name = s
+                { dgName = s
                 , expr = ex
                 , deps = dep
                 , indDeps = dep

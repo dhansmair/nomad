@@ -30,7 +30,7 @@ library
       Environment
       Interpreter
       Lexer
-      MyParser
+      NomadParser
       Simplification
       TypeCheck
       Unification

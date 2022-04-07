@@ -24,13 +24,11 @@
 
 
 
-module MyParser( parse ) where
+module NomadParser( parse ) where
 
-import Control.Monad ( (>=>) )
-import Control.Monad.Except
-import Control.Monad.Trans.Except( ExceptT, throwE )
+import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
 import Lexer ( lexer, Token(..) )
-import Definitions ( Stmt(..), Expr(..), Op(..), MyError(..) )
+import Definitions ( Stmt(..), Expr(..), Op(..), MyError(..), MyException )
 import qualified Data.Array as Happy_Data_Array
 import qualified Data.Bits as Bits
 import Control.Applicative(Applicative(..))
@@ -658,7 +656,7 @@ happyReduction_7 (_ `HappyStk`
 	(HappyTerminal (TokenId happy_var_1)) `HappyStk`
 	happyRest)
 	 = HappyAbsSyn6
-		 (App (Var happy_var_1) (reverse happy_var_3)
+		 (makeApp (Var happy_var_1) (reverse happy_var_3)
 	) `HappyStk` happyRest
 
 happyReduce_8 = happyReduce 4 6 happyReduction_8
@@ -668,7 +666,7 @@ happyReduction_8 (_ `HappyStk`
 	(HappyAbsSyn6  happy_var_1) `HappyStk`
 	happyRest)
 	 = HappyAbsSyn6
-		 (App happy_var_1 (reverse happy_var_3)
+		 (makeApp happy_var_1 (reverse happy_var_3)
 	) `HappyStk` happyRest
 
 happyReduce_9 = happyReduce 4 6 happyReduction_9
@@ -678,7 +676,7 @@ happyReduction_9 (_ `HappyStk`
 	(HappyAbsSyn6  happy_var_1) `HappyStk`
 	happyRest)
 	 = HappyAbsSyn6
-		 (App happy_var_1 (idlist2list (reverse happy_var_3))
+		 (makeApp happy_var_1 (idlist2list (reverse happy_var_3))
 	) `HappyStk` happyRest
 
 happyReduce_10 = happyReduce 6 6 happyReduction_10
@@ -690,7 +688,7 @@ happyReduction_10 (_ `HappyStk`
 	_ `HappyStk`
 	happyRest)
 	 = HappyAbsSyn6
-		 (App happy_var_2 (reverse happy_var_5)
+		 (makeApp happy_var_2 (reverse happy_var_5)
 	) `HappyStk` happyRest
 
 happyReduce_11 = happyReduce 6 6 happyReduction_11
@@ -702,7 +700,7 @@ happyReduction_11 (_ `HappyStk`
 	_ `HappyStk`
 	happyRest)
 	 = HappyAbsSyn6
-		 (App happy_var_2 (idlist2list (reverse happy_var_5))
+		 (makeApp happy_var_2 (idlist2list (reverse happy_var_5))
 	) `HappyStk` happyRest
 
 happyReduce_12 = happyReduce 4 7 happyReduction_12
@@ -712,7 +710,7 @@ happyReduction_12 ((HappyAbsSyn10  happy_var_4) `HappyStk`
 	_ `HappyStk`
 	happyRest)
 	 = HappyAbsSyn7
-		 (Abs (reverse happy_var_2) happy_var_4
+		 (makeAbs (reverse happy_var_2) happy_var_4
 	) `HappyStk` happyRest
 
 happyReduce_13 = happySpecReduce_1  8 happyReduction_13
@@ -1024,14 +1022,28 @@ idlist2list [] = []
 idlist2list (x:xs) = (Var x) : (idlist2list xs)
 
 idFunc2App :: IdFunc -> Expr 
-idFunc2App (IdFunc i idList) = App (Var i) (idlist2list idList)
+idFunc2App (IdFunc i idList) = makeApp (Var i) (idlist2list idList)
 
 makeDef :: IdFunc -> Expr -> Stmt 
-makeDef (IdFunc s idList) ex = Def s (Abs idList ex)
+makeDef (IdFunc s idList) ex = Def s (makeAbs idList ex)
+
+makeApp :: Expr -> [Expr] -> Expr
+makeApp ex [] = ex
+makeApp ex (x:xs) = makeApp (App ex x) xs 
+
+makeAbs :: [String] -> Expr -> Expr 
+makeAbs [] ex = ex
+makeAbs (x:xs) ex = Abs x (makeAbs xs ex)
+
+
+parse' :: String -> Either MyError Stmt
+parse' s = do
+    res <- runExceptT $ parse s
+    res
 
 
 
-parse :: (Monad m) => String -> ExceptT MyError m Stmt
+parse :: (Monad m) => String -> MyException m Stmt
 parse s = do
     tokens <- lexer s
     let res = calc tokens
