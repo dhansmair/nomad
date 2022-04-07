@@ -24,6 +24,7 @@ import Control.Monad.Trans.State
 import Definitions 
 import Environment
 
+
 evaluate :: Monad m => Expr -> MyException (EnvT m) Expr
 evaluate (Num n) = return $ Num n
 evaluate (Var s) = do
@@ -45,18 +46,18 @@ evaluate (App ex []) = evaluate ex
 evaluate (App ex (a:args)) = do
     f <- evaluate ex
     case f of 
-        Builtin (B _ f) -> do
+        Builtin (B _ f') -> do
             -- evaluate builtin function
             -- no partial application possible
             results <- mapM evaluate (a:args)
-            exceptify $ f results
+            exceptify $ f' results
         _ -> do
             a' <- evaluate a
-            f' <- exceptify $ betaReduce (alphaRename f) a'
+            f' <- betaReduce (alphaRename f) a'
             evaluate (App f' args)
 
 -- helper function which unwraps an either value or throws an exception
-exceptify :: Monad m => (Either MyError Expr) -> MyException m Expr
+exceptify :: Monad m => Either MyError Expr -> MyException m Expr
 exceptify eith = case eith of
     Right ex -> return ex
     Left err -> throwE err
@@ -65,9 +66,9 @@ exceptify eith = case eith of
 -- intended to be only used on abstractions that still have remaining parameters
 -- the RuntimeError would normally not occur here, this should already be cought 
 -- by the type system
-betaReduce :: Expr -> Expr -> Either MyError Expr
+betaReduce :: Monad m =>  Expr -> Expr -> MyException m Expr
 betaReduce (Abs (p:ps) ex) arg = return $ Abs ps (replaceWith arg p ex)
-betaReduce other arg = Left $ RuntimeError "Left side of application is not an abstraction"
+betaReduce other arg = throwE $ RuntimeError "Left side of application is not an abstraction"
 
 -- replaceWith obj -> matcher -> body
 replaceWith :: Expr -> String -> Expr -> Expr
@@ -86,7 +87,7 @@ replaceWith arg s (App ex args) = do
 replaceWith arg s (Abs params ex) = Abs params (replaceWith arg s ex) 
 
 
-alphaRename ex = evalState (alphaRenameM ex) ([], names)
+alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
     where
         names = map (\s -> 'x' : show s) (iterate (+1) 1)
 
@@ -123,6 +124,61 @@ alphaRename ex = evalState (alphaRenameM ex) ([], names)
         alphaRenameM (Builtin b) = return $ Builtin b
 
 
+-- list for visited but not changed variables, and list for renamings.
+-- whenever a new abstraction is encountered, it is checked whether the name
+-- was visited but not changed.
+-- If yes, a new replacing is introduced.
+-- However, multiple replacings could occur.
+-- In that case, the replacing must only happen within the scope of the variable.
+type ARState = ([String], [(String, String)], [String])
+alphaRename :: Expr -> Expr
+alphaRename ex = evalState (ren ex) ([], [], names)
+    where 
+        names = map (\s -> '#' : show s) (iterate (+1) 1)
+
+        ren :: Expr -> State ARState Expr
+        ren (Var x) = do
+            (v, renamings, nl) <- get
+            case lookup x renamings of
+                Nothing -> return $ Var x
+                Just x' -> return $ Var x'
+        ren (BinOp op a b) = do
+            a' <- ren a
+            b' <- ren b
+            return $ BinOp op a' b'
+        ren (App ex args) = do
+            ex' <- ren ex
+            args' <- mapM ren args
+            return $ App ex' args'
+
+        ren (Abs params ex) = do
+            (_, renamings, _) <- get
+
+            -- for every param, check if in visited, if not add, 
+            -- but if yes, fetch a new name and introduce a renaming.
+            -- however, the same number of renamings must be popped afterwards.
+            params' <- mapM checkVar params
+            ex' <- ren ex
+            (visited', _, nl') <- get
+            put (visited', renamings, nl')
+            return $ Abs params' ex'
+
+        -- ren (Builtin b) = return $ Builtin b
+        -- ren (Num n) = return $ Num n
+        ren other = return other
+
+        checkVar :: String -> State ARState String
+        checkVar s = do
+            (visited, renamings, nl) <- get
+            if s `elem` visited then do
+                let s' = head nl
+                put (visited, (s, s'):renamings, tail nl)
+                return s'
+            else do
+                put (s:visited, renamings, nl)
+                return s
+
+
 -- helper function to evaluate binary operations on numbers
 applyBinOp :: Op -> Expr -> Expr -> Either MyError Expr
 applyBinOp op (Num a) (Num b) = Right $ Num $ applyBinOp' op a b
@@ -136,5 +192,6 @@ applyBinOp op (Num a) (Num b) = Right $ Num $ applyBinOp' op a b
 -- should be handled by the type system
 applyBinOp op _ _ = Left $ RuntimeError $ "Tried to apply " ++ showEx op 
                             ++ " to wrong data types." 
+
 
 
