@@ -38,7 +38,7 @@ import Data.Maybe ( mapMaybe )
 import Data.List ( intercalate )
 
 import Definitions
-import Utils ( makeApp )
+import Utils ( makeApp, op2app )
 import Unification ( unify, calcUnifier )
 
 type TypeAssumption = (String, Type)
@@ -129,30 +129,23 @@ getTypeM (Var x) = do
         Nothing -> throwError $ UndefinedVariableError $ "Variable " ++ x ++ " undefined or invalid, cannot check type."
         Just t -> do
             case t of
-              -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
-              -- It is implicitly all-quantified in gamma. 
-              -- So use substituteTypeVars to give the variables new names.
-              (TComb list) -> do
-                (g, nl, eqs) <- get
-                let (t', rest) = substituteTypeVars t nl
-                put (g, rest, eqs)
-                return t'
-              -- AxV: otherwise we have AxV, just return the type
-              _ -> return t
+                -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
+                -- It is implicitly all-quantified in gamma. 
+                -- So use substituteTypeVars to give the variables new names.
+                (TComb list) -> do
+                    (g, nl, eqs) <- get
+                    let (t', rest) = substituteTypeVars t nl
+                    put (g, rest, eqs)
+                    return t'
+                -- AxV: otherwise we have AxV, just return the type
+                _ -> return t
 
 -- AxK: we only have one type of constructor, which has the type num
 getTypeM (Num x) = return TNum
 
 -- transform binary operators into applications of supercombinators.
 -- the type (which is always num -> num -> num) is then looked up in gamma
-getTypeM (BinOp op a b) = getTypeM (makeApp (Var (op2name op)) [a, b])
-    where
-        op2name :: Op -> String
-        op2name Add = "#add"
-        op2name Sub = "#sub"
-        op2name Mul = "#mul"
-        op2name Div = "#div"
-        op2name Pow = "#pow"
+getTypeM (BinOp op a b) = getTypeM $ op2app op a b 
 
 -- RAbs: rule for abstractions
 getTypeM (Abs s ex) = do

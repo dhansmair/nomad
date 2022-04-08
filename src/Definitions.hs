@@ -93,7 +93,9 @@ instance ShowEx Expr where
     -- showEx (App (Var s) exprs) = s ++ "(" ++ pPrintList exprs ++ ")"
     showEx (App (Var s) ex) = s ++ "(" ++ showEx ex ++ ")"
     showEx (App s t) = "(" ++ showEx s ++ ")(" ++ showEx t ++ ")"
-    showEx (Abs x ex) = '\\' : x ++ " -> " ++ showEx ex
+    showEx (Abs x ex) = 
+        let (args, ex') = squeezeAbs (Abs x ex)
+         in '\\' : intercalate ", " args ++ " -> " ++ showEx ex'
     showEx (Builtin b) = name b
 
 instance ShowEx Op where
@@ -106,6 +108,12 @@ instance ShowEx Op where
 -- helper function for showEx
 pPrintList :: [Expr] -> String
 pPrintList list = intercalate ", " $ map showEx list
+
+squeezeAbs :: Expr -> ([String], Expr)
+squeezeAbs (Abs s ex) =
+    let (l, ex') = squeezeAbs ex
+     in (s:l, ex')
+squeezeAbs other = ([], other)
 
 -- custom error type used throughout our program
 data MyError = BlankError String

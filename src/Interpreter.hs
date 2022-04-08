@@ -23,58 +23,30 @@ import Control.Monad.Identity
 import Control.Monad.Trans.State
 import Definitions 
 import Environment
+import Builtins ( evalBuiltin )
+import Utils ( exceptify, makeApp, op2app )
 
 
 evaluate :: Monad m => Expr -> MyException (EnvT m) Expr
-evaluate (Num n) = return $ Num n
 evaluate (Var s) = do
     valOrErr <- lift $ lookupValueT s
     val <- exceptify valOrErr
     evaluate val
-
-evaluate (BinOp op e1 e2) = do
-    n1 <- evaluate e1
-    n2 <- evaluate e2
-    exceptify $ applyBinOp op n1 n2
-
-evaluate (Abs s ex) = return $ Abs s ex
-
-evaluate (Builtin b) = return $ Builtin b
+evaluate (BinOp op a b) = evaluate $ op2app op a b
 evaluate (App s t) = do
     s' <- evaluate s
     case s' of 
         Builtin b -> do
             t' <- evaluate t
-
-            if length (args b) == narg b - 1 then do
-                -- apply the function
-                let args' = reverse (t' : args b)  
-                exceptify $ func b args'
-            else if length (args b) < narg b then do
-                -- return a new builtin, but add the 
-                return $ Builtin $ b {args=t':args b}
-            else do
-                error "error in builtins, should not happen"
-
-        _ -> do
+            exceptify $ evalBuiltin b t'
+        Abs param ex -> do
             t' <- evaluate t
-            app' <- betaReduce (alphaRename s') t'
-            evaluate app'
+            evaluate $ replaceWith t' param ex
+        _ -> error "Left side of App is not an Abs, should have been prevented by the type system. It is a bug in Nomad"
+evaluate other = return other
 
--- helper function which unwraps an either value or throws an exception
-exceptify :: Monad m => Either MyError Expr -> MyException m Expr
-exceptify eith = case eith of
-    Right ex -> return ex
-    Left err -> throwE err
 
--- betaReduce: small helper function for evaluate
--- intended to be only used on abstractions that still have remaining parameters
--- the RuntimeError would normally not occur here, this should already be cought 
--- by the type system
-betaReduce :: Monad m =>  Expr -> Expr -> MyException m Expr
-betaReduce (Abs p ex) arg = return $ replaceWith arg p ex
-betaReduce other arg = throwE $ RuntimeError "Left side of application is not an abstraction"
-
+-- TODO ordering of arguments is not intuitive?
 -- replaceWith obj -> matcher -> body
 replaceWith :: Expr -> String -> Expr -> Expr
 replaceWith arg s (Num n) = Num n
@@ -173,32 +145,4 @@ alphaRename ex = evalState (ren ex) ([], [], names)
                 return $ Abs s ex'
 
         ren other = return other
-
-        checkVar :: String -> State ARState String
-        checkVar s = do
-            (visited, renamings, nl) <- get
-            if s `elem` visited then do
-                let s' = head nl
-                put (visited, (s, s'):renamings, tail nl)
-                return s'
-            else do
-                put (s:visited, renamings, nl)
-                return s
-
-
--- helper function to evaluate binary operations on numbers
-applyBinOp :: Op -> Expr -> Expr -> Either MyError Expr
-applyBinOp op (Num a) (Num b) = Right $ Num $ applyBinOp' op a b
-            where
-                applyBinOp' Add a b = a + b
-                applyBinOp' Sub a b = a - b
-                applyBinOp' Mul a b = a * b
-                applyBinOp' Div a b = a / b
-                applyBinOp' Pow a b = a ** b
-
--- should be handled by the type system
-applyBinOp op _ _ = Left $ RuntimeError $ "Tried to apply " ++ showEx op 
-                            ++ " to wrong data types." 
-
-
 

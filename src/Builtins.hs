@@ -2,7 +2,7 @@
     Module to define all the builtin math stuff
 -}
 
-module Builtins ( stdEnv ) where
+module Builtins ( stdEnv, evalBuiltin ) where
 
 
 import Definitions
@@ -144,3 +144,19 @@ makeTernary s f = Builtin $ B {name=s, narg=3, args=[], func=makeTernary' f}
         makeTernary' f [_, _, _] = nanMsg
         makeTernary' f _ = numArgMsg
 
+
+-- evaluate a Builtin with an argument.
+-- if the parameters are saturated, execute the builtin, otherwise just store
+-- the argument inside the builtin for later.
+evalBuiltin :: Builtin -> Expr -> Either MyError Expr
+evalBuiltin b arg = do 
+    if length (args b) == narg b - 1 then do
+        -- apply the function
+        let args' = reverse (arg : args b)  
+         in func b args'
+
+    else if length (args b) < narg b then do
+        -- return a new builtin, but add the 
+        return $ Builtin $ b {args=arg:args b}
+    else do
+        error "error in builtins, should not happen"
