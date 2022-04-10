@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-
 this Module exports the function 'getType', which determines the type for a 
 given expression.
@@ -31,9 +32,11 @@ module TypeCheck ( getType
 
 
 import Control.Monad
-import Control.Monad.Except
+import Control.Monad.State.Class ( MonadState )
+import Control.Monad.Except --( MonadError, throwError )
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
+import Control.Monad.Trans.Writer
 import Data.Maybe ( mapMaybe )
 import Data.List ( intercalate )
 
@@ -42,8 +45,11 @@ import Utils ( makeApp, op2app )
 import Unification ( unify, calcUnifier )
 
 type TypeAssumption = (String, Type)
-type MyState = ([TypeAssumption], [String], [TypeEquation])
-
+-- MyState consists of an initial set of type assumptions,
+-- fresh names,
+-- and equations that are collected.
+type MyState = ([TypeAssumption], [String])
+type TypeInferenceT m = StateT MyState (WriterT [TypeEquation] m)
 
 
 -- the main function of this module.
@@ -57,14 +63,14 @@ type MyState = ([TypeAssumption], [String], [TypeEquation])
 -- getType internally calls the monadic function getTypeM
 getType :: (Monad m) => Expr -> MyException (EnvT m) Type
 getType ex = do
-    gamma0 <- lift getGamma
+    gamma0 <- lift getInitialAssumptions
     let names  = map (\s -> 'a' : show s) (iterate (+1) 1)
-    let state0 = (gamma0, names, [])
-    (t, (_, _, equations)) <- runStateT (getTypeM ex) state0
+    let state0 = (gamma0, names)
+    (t, equations) <- runWriterT $ evalStateT (getTypeM ex) state0
 
     case unify t equations of 
         (Just t2) -> return $ substituteSaneNames t2
-        Nothing -> throwE $ TypeError "unification failed"
+        Nothing -> throwError $ TypeError "unification failed"
 
 
 -- this is a non-Monadic version of getType. 
@@ -72,12 +78,12 @@ getType ex = do
 getTypePure :: Expr -> [TypeAssumption] -> Either MyError Type
 getTypePure ex gamma0 = do
     let names  = map (\s -> 'a' : show s) (iterate (+1) 1)
-    let state0 = (gamma0, names, [])
-    res <- runExceptT $ runStateT (getTypeM ex) state0
+    let state0 = (gamma0, names)
+    res <- runExceptT $ runWriterT $ evalStateT (getTypeM ex) state0
 
     case res of
         Left err -> Left err
-        Right (t, (_, _, equations)) -> 
+        Right (t, equations) -> 
             case unify t equations of 
                 (Just t2) -> Right $ substituteSaneNames t2
                 Nothing -> Left $ TypeError "unification failed"
@@ -90,42 +96,42 @@ getTypeEither ex = runExceptT (getType ex)
 
 
 -- helper function to extract the initial type assumptions from EnvT
-getGamma :: (Monad m) => EnvT m [TypeAssumption]
-getGamma = do mapMaybe helper <$> get
+getInitialAssumptions :: (Monad m) => EnvT m [TypeAssumption]
+getInitialAssumptions = do mapMaybe helper <$> get
     where
         helper (s, _, Right t, _) = Just (s, t)
         helper (_, _, Left _, _) = Nothing
 
 -- helper functions to easier access and modify the state monad
 -- get new type variable with a fresh name
-getName :: (Monad m) => StateT MyState m Type
+getName :: (Monad m) => TypeInferenceT m Type
 getName = do
-    (gamma, names, eqs) <- get
-    put (gamma, tail names, eqs)
+    (gamma, names) <- get
+    put (gamma, tail names)
     return (TVar (head names))
 
--- get n fresh type variables
-getNames :: (Monad m) => Int -> StateT MyState m [Type]
-getNames n = replicateM n getName
+getAssumptions :: (Monad m) => TypeInferenceT m [TypeAssumption]
+getAssumptions = do
+    (assumptions, _) <- get
+    return assumptions
 
 -- add a new type assumption to the state
-addGamma :: (Monad m) => TypeAssumption -> StateT MyState m ()
-addGamma g = do
-    (gamma, nl, eqs) <- get
-    put (g:gamma, nl, eqs)
+addAssumption :: (Monad m) => TypeAssumption -> TypeInferenceT m ()
+addAssumption g = do
+    (assumptions, nl) <- get
+    put (g:assumptions, nl)
 
 -- add a new type equation to the state
-addEquation :: (Monad m) => TypeEquation -> StateT MyState m ()
+addEquation :: (Monad m) => TypeEquation -> TypeInferenceT m ()
 addEquation eq = do
-    (gamma, nl, oldEqs) <- get
-    put (gamma, nl, eq:oldEqs)
+    lift $ tell [eq]
     
 -- AxV / AxSK:
 -- type should be already determined -> Lookup in gamma
-getTypeM :: (Monad m) => Expr -> StateT MyState (MyException m) Type
+getTypeM :: (Monad m) => Expr -> TypeInferenceT (MyException m) Type
 getTypeM (Var x) = do
-    (gamma, _, _) <- get
-    case lookup x gamma of
+    assumptions <- getAssumptions
+    case lookup x assumptions of
         Nothing -> throwError $ UndefinedVariableError $ "Variable " ++ x ++ " undefined or invalid, cannot check type."
         Just t -> do
             case t of
@@ -133,11 +139,11 @@ getTypeM (Var x) = do
                 -- It is implicitly all-quantified in gamma. 
                 -- So use substituteTypeVars to give the variables new names.
                 (TComb list) -> do
-                    (g, nl, eqs) <- get
+                    (g, nl)  <- get
                     let (t', rest) = substituteTypeVars t nl
-                    put (g, rest, eqs)
+                    put (g, rest)
                     return t'
-                -- AxV: otherwise we have AxV, just return the type
+                --AxV: otherwise we have AxV, just return the type
                 _ -> return t
 
 -- AxK: we only have one type of constructor, which has the type num
@@ -149,10 +155,10 @@ getTypeM (BinOp op a b) = getTypeM $ op2app op a b
 
 -- RAbs: rule for abstractions
 getTypeM (Abs s ex) = do
-    newTypeVar <- getName
-    addGamma (s,  newTypeVar)
+    alpha <- getName
+    addAssumption (s,  alpha)
     t <- getTypeM ex
-    return $ TComb [newTypeVar, t]
+    return $ TComb [alpha, t]
 
 -- RApp: rule for application
 getTypeM (App s t) = do
