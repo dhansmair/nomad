@@ -27,9 +27,12 @@ unify t eqs = do
     return $ replaceVariables t unifier
       where
         replaceVariables :: Type -> [TypeEquation] -> Type
-        replaceVariables TNum _        = TNum
-        replaceVariables (TVar x)  eqs = fromMaybe (TVar x) (lookup (TVar x) eqs)
-        replaceVariables (TComb t) eqs = TComb $ map (`replaceVariables` eqs) t
+        replaceVariables TNum _  = TNum
+        replaceVariables (TVar x) eqs = fromMaybe (TVar x) (lookup (TVar x) eqs)
+        replaceVariables (TArr l r) eqs = 
+            let l' = replaceVariables l eqs
+                r' = replaceVariables r eqs
+             in TArr l' r'
 
 
 
@@ -43,9 +46,9 @@ calcUnifier :: [TypeEquation] -> Maybe [TypeEquation]
 calcUnifier eqs = do
 
     -- simplify equations
-    let eqs1 = map (\(x,y) -> (simplifyType x, simplifyType y)) eqs
+    -- let eqs1 = map (\(x,y) -> (simplifyType x, simplifyType y)) eqs
     -- elim
-        eqs2 = filter (\(x,y) -> x/=y) eqs1
+    let eqs2 = filter (\(x,y) -> x/=y) eqs
 
     -- checks
     eqs3 <- mapM (failCheck >=> occursCheck) eqs2
@@ -68,27 +71,27 @@ calcUnifier eqs = do
 -- num = a -> b fails
 -- a -> b = num fails
 failCheck :: TypeEquation -> Maybe TypeEquation
-failCheck (TNum, TComb _) = Nothing
-failCheck (TComb _, TNum) = Nothing
+failCheck (TArr _ _, TNum) = Nothing
+failCheck (TNum, TArr _ _) = Nothing
 failCheck eq = Just eq
 
 -- check if an equation has a var on the left that appears in a type on the right
 occursCheck :: TypeEquation -> Maybe TypeEquation
-occursCheck (TVar x, TComb list) = 
-    if appearsIn x (TComb list) 
+occursCheck (TVar x, TArr l r) = 
+    if appearsIn x (TArr l r) 
         then Nothing 
-    else Just (TVar x, TComb list)
+    else Just (TVar x, TArr l r)
 occursCheck eq = Just eq 
 
 -- check if rule 'orient' can be applied to an equation
 canOrient :: TypeEquation -> Bool
-canOrient (TNum, TVar x) = True
-canOrient (TComb l, TVar x) = True
+canOrient (TNum, TVar _) = True
+canOrient (TArr _ _, TVar _) = True
 canOrient _ = False
 
 -- check if rule 'decompose' an be applied to an equation
 canDecomp :: TypeEquation -> Bool
-canDecomp (TComb l1, TComb l2) = length l1 >= 2 && length l2 >=2
+canDecomp (TArr _ _, TArr _ _) = True
 canDecomp _ = False
 
 
@@ -98,7 +101,7 @@ orient = map orientEq
     where
         orientEq :: TypeEquation -> TypeEquation
         orientEq (TNum, TVar x) = (TVar x, TNum)
-        orientEq (TComb l, TVar x) = (TVar x, TComb l) 
+        orientEq (TArr l r, TVar x) = (TVar x, TArr l r)
         orientEq other = other
 
 -- apply 'decompose' to a list of equations
@@ -106,10 +109,8 @@ decompose :: [TypeEquation] -> [TypeEquation]
 decompose = concatMap decompEq
     where
         decompEq :: TypeEquation -> [TypeEquation]
-        decompEq (TComb (x1:x2:xs), TComb (y1:y2:ys)) = (x1,y1): decompEq (TComb (x2:xs), TComb (y2:ys))
+        decompEq (TArr l1 r1, TArr l2 r2) = [(l1, l2), (r1, r2)]
         decompEq other = [other]
-
-
 
 -- check if there is an equation of pattern (var, _), where var either appears
 -- twice on the left side, or at least once on the right side in the list of all type equations.
@@ -137,8 +138,9 @@ solve list eq = eq : map (replaceWithEq eq) list
         replaceWithEq eq (lhs, rhs) = (replaceWith eq lhs, replaceWith eq rhs)
 
         replaceWith :: TypeEquation -> Type -> Type
-        replaceWith (a,b) (TComb list) | a == TComb list = b 
-                                       | otherwise = TComb $ map (replaceWith (a,b)) list
+        replaceWith (a,b) (TArr l r)   
+            | a == TArr l r = b
+            | otherwise = TArr (replaceWith (a, b) l) (replaceWith (a, b) r)
         replaceWith (a,b) structure    | a == structure = b
                                        | otherwise = structure
 
@@ -148,13 +150,14 @@ solve list eq = eq : map (replaceWithEq eq) list
 appearsIn :: String -> Type -> Bool
 appearsIn s TNum         = False
 appearsIn s (TVar x)     = s == x
-appearsIn s (TComb list) = any (appearsIn s) list
+appearsIn s (TArr l r) = appearsIn s l || appearsIn s r
 
 -- simplifyType: flatten a type as far as possible
-simplifyType :: Type -> Type
-simplifyType TNum = TNum
-simplifyType (TVar s) = TVar s
-simplifyType (TComb [el]) = simplifyType el
-simplifyType (TComb list) = TComb $ map simplifyType list
+-- simplifyType :: Type -> Type
+-- simplifyType TNum = TNum
+-- simplifyType (TVar s) = TVar s
+-- simplifyType (TComb [el]) = simplifyType el
+-- simplifyType (TComb list) = TComb $ map simplifyType list
+-- simplifyType other = other
 
 

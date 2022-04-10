@@ -5,6 +5,11 @@ import Definitions
 import Control.Monad.Trans.Except ( throwE ) 
 
 
+tComb :: [Type] -> Type
+tComb [] = error "Error, type list must not be empty"
+tComb [x] = x
+tComb (x:y:xs) = TArr x (tComb (y:xs))
+
 makeApp :: Expr -> [Expr] -> Expr
 makeApp = foldl App
 
@@ -35,16 +40,3 @@ str2op other = error $ other ++ "is not a valid operator name"
 op2app :: Op -> Expr -> Expr -> Expr
 op2app op a b = makeApp (Var (op2str op)) [a, b]
 
--- decompress :: Expr -> Expr
--- decompress (Abs (p1:p2:ps) ex) = Abs [p1] (Abs (p2:ps) (decompress ex))
--- decompress (Abs [p] ex) = Abs [p] ex
--- decompress (Abs [] ex) = ex
--- decompress (App ex args) = App (decompress ex) (map decompress args)
--- decompress (BinOp op a b) = BinOp op (decompress a) (decompress b)
--- decompress other = other
-
--- compress :: Expr -> Expr
--- compress (Abs ps1 (Abs ps2 ex)) = compress $ Abs (ps1 ++ ps2) ex
--- compress (App ex args) = App (compress ex) (map compress args)
--- compress (BinOp op a b) = BinOp op (compress a) (compress b)
--- compress other = other

@@ -28,6 +28,7 @@ library
       Builtins
       Definitions
       Environment
+      Frisch
       Interpreter
       Lexer
       NomadParser

@@ -8,7 +8,7 @@ module Builtins ( stdEnv, evalBuiltin ) where
 import Definitions
 import Environment
 import Debug.Trace
-import Utils ( makeApp, makeAbs)
+import Utils ( makeApp, makeAbs, tComb )
 import Simplification (simplify)
 
 
@@ -25,32 +25,32 @@ stdEnv =
     [ 
     -- # functions are internals that cannot be used directly from the command line.
     -- Those are needed for the typecheck of the binary operations.
-      ("#add", addB,       Right (TComb [TNum, TNum, TNum]), [])
-    , ("#sub", subB,       Right (TComb [TNum, TNum, TNum]), [])
-    , ("#mul", mulB,       Right (TComb [TNum, TNum, TNum]), [])
-    , ("#div", divB,       Right (TComb [TNum, TNum, TNum]), [])
-    , ("#pow", powB,       Right (TComb [TNum, TNum, TNum]), [])
+      ("#add", addB,       Right (tComb [TNum, TNum, TNum]), [])
+    , ("#sub", subB,       Right (tComb [TNum, TNum, TNum]), [])
+    , ("#mul", mulB,       Right (tComb [TNum, TNum, TNum]), [])
+    , ("#div", divB,       Right (tComb [TNum, TNum, TNum]), [])
+    , ("#pow", powB,       Right (tComb [TNum, TNum, TNum]), [])
 
     -- default library functions
-    , ("sin", sinB,        Right (TComb [TNum, TNum]), [])
-    , ("cos", cosB,        Right (TComb [TNum, TNum]), [])
-    , ("tan", tanB,        Right (TComb [TNum, TNum]), [])
-    , ("exp", expB,        Right (TComb [TNum, TNum]), [])
-    , ("ln" , lnB,         Right (TComb [TNum, TNum]), [])
-    , ("log" , logB,       Right (TComb [TNum, TNum, TNum]), [])
-    , ("root", rootB,      Right (TComb [TNum, TNum, TNum]), [])
-    , ("sqrt", sqrtB,      Right (TComb [TNum, TNum]), [])
+    , ("sin", sinB,        Right (tComb [TNum, TNum]), [])
+    , ("cos", cosB,        Right (tComb [TNum, TNum]), [])
+    , ("tan", tanB,        Right (tComb [TNum, TNum]), [])
+    , ("exp", expB,        Right (tComb [TNum, TNum]), [])
+    , ("ln" , lnB,         Right (tComb [TNum, TNum]), [])
+    , ("log" , logB,       Right (tComb [TNum, TNum, TNum]), [])
+    , ("root", rootB,      Right (tComb [TNum, TNum, TNum]), [])
+    , ("sqrt", sqrtB,      Right (tComb [TNum, TNum]), [])
 
     -- other
-    , ("abs", absB,        Right (TComb [TNum, TNum]), [])
-    , ("max", maxB,        Right (TComb [TNum, TNum, TNum]), [])
+    , ("abs", absB,        Right (tComb [TNum, TNum]), [])
+    , ("max", maxB,        Right (tComb [TNum, TNum, TNum]), [])
 
     -- constants
     , ("e"  , Num (exp 1), Right TNum, [])
     , ("pi" , Num pi,      Right TNum, [])
 
-    , ("derive", deriveB,  Right (TComb [TComb [TNum, TNum], TComb [TNum, TNum]]), [])
-    , ("id"    , idB,      Right (TComb [TVar "a", TVar "a"]), [])
+    , ("derive", deriveB,  Right (tComb [tComb [TNum, TNum], tComb [TNum, TNum]]), [])
+    , ("id"    , idB,      Right (tComb [TVar "a", TVar "a"]), [])
     ]
 
 

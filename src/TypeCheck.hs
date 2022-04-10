@@ -132,13 +132,14 @@ getTypeM :: (Monad m) => Expr -> TypeInferenceT (MyException m) Type
 getTypeM (Var x) = do
     assumptions <- getAssumptions
     case lookup x assumptions of
-        Nothing -> throwError $ UndefinedVariableError $ "Variable " ++ x ++ " undefined or invalid, cannot check type."
+        Nothing -> throwError $ UndefinedVariableError x
         Just t -> do
             case t of
                 -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
                 -- It is implicitly all-quantified in gamma. 
                 -- So use substituteTypeVars to give the variables new names.
-                (TComb list) -> do
+                -- (TComb list) -> do
+                (TArr _ _) -> do
                     (g, nl)  <- get
                     let (t', rest) = substituteTypeVars t nl
                     put (g, rest)
@@ -158,14 +159,14 @@ getTypeM (Abs s ex) = do
     alpha <- getName
     addAssumption (s,  alpha)
     t <- getTypeM ex
-    return $ TComb [alpha, t]
+    return $ TArr alpha t
 
 -- RApp: rule for application
 getTypeM (App s t) = do
     tau1 <- getTypeM s 
     tau2 <- getTypeM t
     alpha <- getName
-    addEquation (tau1, TComb [tau2, alpha]) 
+    addEquation (tau1, TArr tau2 alpha) 
     return alpha
 
 
@@ -192,9 +193,13 @@ substituteTypeVars t names =
                   let x = head list
                   put ((s,x):replacings, tail list)
                   return $ TVar x
-        subst (TComb list) = do
-            list' <- mapM subst list
-            return $ TComb list'
+        -- subst (TComb list) = do
+        --     list' <- mapM subst list
+        --     return $ TComb list'
+        subst (TArr l r) = do
+            l' <- subst l
+            r' <- subst r
+            return $ TArr l' r'
 
 
 -- helper function that replaces type variables with easier to read ones,

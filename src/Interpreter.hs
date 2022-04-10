@@ -18,6 +18,7 @@ module Interpreter( evaluate, alphaRename ) where
 import Debug.Trace
 import Control.Monad
 import Control.Monad.Except
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Identity 
 import Control.Monad.Trans.State
@@ -25,6 +26,7 @@ import Definitions
 import Environment
 import Builtins ( evalBuiltin )
 import Utils ( exceptify, makeApp, op2app )
+import Frisch ( FrischT, Frisch, frisch, runFrischT )
 
 
 evaluate :: Monad m => Expr -> MyException (EnvT m) Expr
@@ -66,6 +68,38 @@ replaceWith arg s (App a b) =
 replaceWith arg s (Abs p ex) = Abs p (replaceWith arg s ex) 
 
 
+alphaRename :: Expr -> Expr
+alphaRename ex = evalState (runFrischT (runReaderT (ren ex) []) names) []
+    where 
+        names = ['#':show i | i <- [1..]]
+
+        ren :: Expr -> ReaderT [(String, String)] (FrischT (State [String])) Expr
+        ren (Var x) = do
+            renamings <- ask
+            case lookup x renamings of
+                Nothing -> return $ Var x
+                Just x' -> return $ Var x'
+        ren (BinOp op a b) = do
+            a' <- ren a
+            b' <- ren b
+            return $ BinOp op a' b'
+        ren (App s t) = do
+            s' <- ren s
+            t' <- ren t
+            return $ App s' t'
+        ren (Abs s ex) = do
+            visited <- lift $ lift get
+            if s `elem` visited then do
+                s' <- lift frisch
+                ex' <- local ((s, s'):) (trace ("frisch: " ++ show s') (ren ex))
+                return $ Abs s' ex'
+            else do
+                lift $ lift $ put (s:visited)
+                ex' <- ren ex
+                return $ Abs s ex'
+        ren other = return other
+
+
 alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
     where
         names = map (\s -> 'x' : show s) (iterate (+1) 1)
@@ -96,53 +130,3 @@ alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
             put (renamings, restvars) 
             return $ Abs s' ex'
         alphaRenameM (Builtin b) = return $ Builtin b
-
-
--- list for visited but not changed variables, and list for renamings.
--- whenever a new abstraction is encountered, it is checked whether the name
--- was visited but not changed.
--- If yes, a new replacing is introduced.
--- However, multiple replacings could occur.
--- In that case, the replacing must only happen within the scope of the variable.
-type ARState = ([String], [(String, String)], [String])
-alphaRename :: Expr -> Expr
-alphaRename ex = evalState (ren ex) ([], [], names)
-    where 
-        names = map (\s -> '#' : show s) (iterate (+1) 1)
-
-        ren :: Expr -> State ARState Expr
-        ren (Var x) = do
-            (v, renamings, nl) <- get
-            case lookup x renamings of
-                Nothing -> return $ Var x
-                Just x' -> return $ Var x'
-        ren (BinOp op a b) = do
-            a' <- ren a
-            b' <- ren b
-            return $ BinOp op a' b'
-        ren (App s t) = do
-            s' <- ren s
-            t' <- ren t
-            return $ App s' t'
-
-        ren (Abs s ex) = do
-            (visited, renamings, nl) <- get
-
-            if s `elem` visited then do
-                -- introduce a new renaming
-                let s' = head nl
-                    nl' = tail nl
-                put (visited, (s,s'):renamings, nl')
-                ex' <- ren ex
-                -- but pop it afterwards TODO is this necessary?
-                put (visited, renamings, nl')
-
-                return $ Abs s' ex'
-
-            else do
-                put (s:visited, renamings, nl)
-                ex' <- ren ex
-                return $ Abs s ex'
-
-        ren other = return other
-
