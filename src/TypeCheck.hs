@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+-- {-# LANGUAGE FlexibleContexts #-}
 {-
 this Module exports the function 'getType', which determines the type for a 
 given expression.
@@ -43,14 +43,17 @@ import Data.List ( intercalate )
 import Definitions
 import Utils ( makeApp, op2app )
 import Unification ( unify, calcUnifier )
+import Frisch
 
 type TypeAssumption = (String, Type)
--- MyState consists of an initial set of type assumptions,
--- fresh names,
--- and equations that are collected.
-type MyState = ([TypeAssumption], [String])
-type TypeInferenceT m = StateT MyState (WriterT [TypeEquation] m)
 
+-- custom monad TypeInferenceT:
+-- StateT [TypeAssumption]      initial assumptions (gamma)
+-- FrischT                      contains fresh variable names
+-- WriterT                      collects type equations for later unification
+type TypeInferenceT m = StateT [TypeAssumption] (FrischT (WriterT [TypeEquation] m))
+
+names = ['a': show s | s <- [1..]]
 
 -- the main function of this module.
 -- parameters:
@@ -64,9 +67,7 @@ type TypeInferenceT m = StateT MyState (WriterT [TypeEquation] m)
 getType :: (Monad m) => Expr -> MyException (EnvT m) Type
 getType ex = do
     gamma0 <- lift getInitialAssumptions
-    let names  = map (\s -> 'a' : show s) (iterate (+1) 1)
-    let state0 = (gamma0, names)
-    (t, equations) <- runWriterT $ evalStateT (getTypeM ex) state0
+    (t, equations) <- runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names 
 
     case unify t equations of 
         (Just t2) -> return $ substituteSaneNames t2
@@ -77,15 +78,13 @@ getType ex = do
 -- It is required in some functions that do not know the EnvT monad
 getTypePure :: Expr -> [TypeAssumption] -> Either MyError Type
 getTypePure ex gamma0 = do
-    let names  = map (\s -> 'a' : show s) (iterate (+1) 1)
-    let state0 = (gamma0, names)
-    res <- runExceptT $ runWriterT $ evalStateT (getTypeM ex) state0
+    res <- runExceptT $ runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names
 
     case res of
         Left err -> Left err
         Right (t, equations) -> 
             case unify t equations of 
-                (Just t2) -> Right $ substituteSaneNames t2
+                Just t' -> Right $ substituteSaneNames t'
                 Nothing -> Left $ TypeError "unification failed"
 
 
@@ -106,45 +105,29 @@ getInitialAssumptions = do mapMaybe helper <$> get
 -- get new type variable with a fresh name
 getName :: (Monad m) => TypeInferenceT m Type
 getName = do
-    (gamma, names) <- get
-    put (gamma, tail names)
-    return (TVar (head names))
-
-getAssumptions :: (Monad m) => TypeInferenceT m [TypeAssumption]
-getAssumptions = do
-    (assumptions, _) <- get
-    return assumptions
+    n <- lift frisch
+    return $ TVar n 
 
 -- add a new type assumption to the state
 addAssumption :: (Monad m) => TypeAssumption -> TypeInferenceT m ()
-addAssumption g = do
-    (assumptions, nl) <- get
-    put (g:assumptions, nl)
+addAssumption g = modify (g:)
 
 -- add a new type equation to the state
 addEquation :: (Monad m) => TypeEquation -> TypeInferenceT m ()
-addEquation eq = do
-    lift $ tell [eq]
+addEquation eq = lift $ lift $ tell [eq]
     
 -- AxV / AxSK:
 -- type should be already determined -> Lookup in gamma
 getTypeM :: (Monad m) => Expr -> TypeInferenceT (MyException m) Type
 getTypeM (Var x) = do
-    assumptions <- getAssumptions
+    assumptions <- get
     case lookup x assumptions of
-        Nothing -> throwError $ UndefinedVariableError x
+        Nothing -> lift $ lift $ throwError $ UndefinedVariableError x
         Just t -> do
             case t of
                 -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
-                -- It is implicitly all-quantified in gamma. 
-                -- So use substituteTypeVars to give the variables new names.
-                -- (TComb list) -> do
-                (TArr _ _) -> do
-                    (g, nl)  <- get
-                    let (t', rest) = substituteTypeVars t nl
-                    put (g, rest)
-                    return t'
-                --AxV: otherwise we have AxV, just return the type
+                TArr _ _ -> lift $ substituteTypeVars t
+                -- AxV: otherwise we have AxV, just return the type
                 _ -> return t
 
 -- AxK: we only have one type of constructor, which has the type num
@@ -178,35 +161,29 @@ getTypeM (Builtin _) = error "trying to check type of builtin, this should not h
 -- helper function for the renaming of variables.
 -- used to give new names to all-quantified type assumptions in gamma,
 -- and to subsitute type variable names with readable ones in the end.
-substituteTypeVars :: Type -> [String] -> (Type, [String])
-substituteTypeVars t names = 
-    let (t', (_, rest)) = runState (subst t) ([], names)
-    in (t', rest)
+substituteTypeVars :: (Monad m) => Type -> FrischT m Type
+substituteTypeVars t = evalStateT (subst t) []
     where
-        subst :: Type -> State ([(String, String)], [String]) Type
+        subst :: (Monad m) => Type -> StateT [(String, String)] (FrischT m) Type
         subst TNum = return TNum
         subst (TVar s) = do
-            (replacings, list) <- get
+            replacings <- get
             case lookup s replacings of
-              (Just n) -> return $ TVar n
+              Just n -> return $ TVar n
               Nothing -> do
-                  let x = head list
-                  put ((s,x):replacings, tail list)
-                  return $ TVar x
-        -- subst (TComb list) = do
-        --     list' <- mapM subst list
-        --     return $ TComb list'
+                  n <- lift frisch
+                  modify ((s, n):)
+                  return $ TVar n
         subst (TArr l r) = do
             l' <- subst l
             r' <- subst r
             return $ TArr l' r'
 
-
 -- helper function that replaces type variables with easier to read ones,
 -- i.e. replaces a1, a2, ... an 
 --          with a, b, c, ... a2, b2, ...
 substituteSaneNames :: Type -> Type
-substituteSaneNames t = fst $ substituteTypeVars t saneNames
+substituteSaneNames t = runFrisch (substituteTypeVars t) saneNames
     where
         saneChars = map (:[]) "abcdefghijklmnopqrstuvwxyz"
         saneNames = saneChars ++ [c ++ show n | n <- [2..], c <- saneChars]
