@@ -16,6 +16,9 @@ type EnvDef = (String, Expr, Either MyError Type, [String])
 type Env = [EnvDef]
 type EnvT = StateT Env
 
+-- instance MonadError EnvT where
+
+
 
 type MyException = ExceptT MyError
 
