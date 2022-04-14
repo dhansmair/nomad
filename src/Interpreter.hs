@@ -29,7 +29,7 @@ import Utils ( exceptify, makeApp, op2app )
 import Frisch
 
 
-evaluate :: Monad m => Expr -> MyException (EnvT m) Expr
+evaluate :: Monad m => Expr -> NomadExceptT (EnvT m) Expr
 evaluate (Var s) = do
     res <- lift $ lookupVar s
     case res of

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-
 Contains the lexer function and the 'Token' data type.
 lexer function is inspired by the example in the happy parser documentation.
@@ -6,8 +7,10 @@ lexer function is inspired by the example in the happy parser documentation.
 module Lexer ( lexer, Token(..) ) where
 
 
+import Control.Monad.Except ( throwError )
+import Control.Monad.Error.Class ( MonadError )
 import Control.Monad.Trans.Except
-import Definitions( MyError(..), MyException )
+import Definitions( NomadError(..), NomadExceptT )
 import Data.Char ( isSpace, isDigit, isAlpha )
 
 
@@ -34,7 +37,7 @@ lexer is a function that takes a String and outputs a list of Tokens.
 this is the preprocessing step of parsing.
 lexer will return an error if an invalid character occurs.
 -}
-lexer :: (Monad m) => String -> MyException m [Token]
+lexer :: (Monad m, MonadError NomadError m) => String -> m [Token]
 lexer [] = return []
 lexer ('-':'>':xs) = (TokenArr :) <$> lexer xs
 lexer ('-':xs) = (TokenSub :) <$> lexer xs
@@ -52,13 +55,13 @@ lexer (c : cs)
       | isSpace c = lexer cs
       | isIdStarter c = lexId (c:cs)
       | isDigit c = lexNum (c:cs)
-      | otherwise = throwE $ ParseError $ "Invalid character " ++ [c]
+      | otherwise = throwError $ ParseError $ "Invalid character " ++ [c]
 
 
 -- helper functions
 
 -- consume all characters that can be part of an id, then call lexer on the rest
-lexId :: (Monad m) => String -> MyException m [Token]
+lexId :: (MonadError NomadError m) => String -> m [Token]
 lexId [] = return []
 lexId cs = let (str, rest) = span isIdPart cs 
              in (TokenId str :) <$> lexer rest 
@@ -76,7 +79,7 @@ isIdStarter c = isAlpha c || c `elem` "_'"
 -- .5 -> 0.5
 -- 5. -> 5
 -- 1.02342 -> 1.02342
-lexNum :: (Monad m) => String -> MyException m [Token]
+lexNum :: (MonadError NomadError m) => String -> m [Token]
 lexNum [] = return []
 lexNum cs = 
     let (ld, rest) = span isDigit cs 

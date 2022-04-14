@@ -40,7 +40,7 @@ data DepGraphNode = DependencyGraphNode
     , deps :: [String]
     , indDeps :: [String]
     , reach :: Reach
-    , typ :: Either MyError Type
+    , typ :: Either NomadError Type
     }
     deriving (Show)
 
@@ -54,7 +54,7 @@ getEnvT :: Monad m => EnvT m Env
 getEnvT = get
 
 -- adds a definition into the env
-addDefnT :: Monad m => (String, Expr, Either MyError Type) -> EnvT m ()
+addDefnT :: Monad m => (String, Expr, Either NomadError Type) -> EnvT m ()
 addDefnT d = modify (addDefn d)
   where
     addDefn (s, ex, t) env = (s, ex, t, getDeps ex) : filter (\(sEnv, exEnv, tEnv, depEnv) -> sEnv /= s) env

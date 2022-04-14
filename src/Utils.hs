@@ -17,7 +17,7 @@ makeAbs :: [String] -> Expr -> Expr
 makeAbs params ex = foldr Abs ex params
 
 -- helper function which unwraps an either value or throws an exception
-exceptify :: Monad m => Either MyError Expr -> MyException m Expr
+exceptify :: Monad m => Either NomadError Expr -> NomadExceptT m Expr
 exceptify eith = case eith of
     Right ex -> return ex
     Left err -> throwE err

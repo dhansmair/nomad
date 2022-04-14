@@ -71,7 +71,7 @@ a @-> b = TArr a b
 -- or Right type in case of success.
 --
 -- getType internally calls the monadic function getTypeM
-getType :: (Monad m) => Expr -> MyException (EnvT m) Type
+getType :: (Monad m) => Expr -> NomadExceptT (EnvT m) Type
 getType ex = do
     gamma0 <- lift getInitialAssumptions
     (t, equations) <- runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names 
@@ -83,7 +83,7 @@ getType ex = do
 
 -- this is a non-Monadic version of getType. 
 -- It is required in some functions that do not know the EnvT monad
-getTypePure :: Expr -> [TypeAssumption] -> Either MyError Type
+getTypePure :: Expr -> [TypeAssumption] -> Either NomadError Type
 getTypePure ex gamma0 = do
     res <- runExceptT $ runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names
 
@@ -97,7 +97,7 @@ getTypePure ex gamma0 = do
 
 -- another version of getType that returns an Either instead of throwing 
 -- an exception
-getTypeEither :: (Monad m) => Expr -> (EnvT m) (Either MyError Type)
+getTypeEither :: (Monad m) => Expr -> (EnvT m) (Either NomadError Type)
 getTypeEither ex = runExceptT (getType ex)
 
 
@@ -125,7 +125,7 @@ addEquation eq = lift $ lift $ tell [eq]
     
 -- AxV / AxSK:
 -- type should be already determined -> Lookup in gamma
-getTypeM :: (MonadError MyError m) => Expr -> TypeInferenceT m Type
+getTypeM :: (MonadError NomadError m) => Expr -> TypeInferenceT m Type
 getTypeM (Var x) = do
     assumptions <- get
     case lookup x assumptions of

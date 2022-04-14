@@ -12,7 +12,7 @@ import Utils ( makeApp, makeAbs, tComb )
 import Simplification (simplify)
 
 
-type BuiltinFunc = [Expr] -> Either MyError Expr
+type BuiltinFunc = [Expr] -> Either NomadError Expr
 
 nanMsg = Left $ RuntimeError "builtin function requires input of type Num"
 numArgMsg = Left $ RuntimeError "wrong number of arguments to [builtin]"
@@ -77,7 +77,7 @@ sqrtB = makeAbs ["x"] (BinOp Pow (Var "x") (Num 0.5))
 
 deriveB = Builtin $ B {name="derive", narg=1, func=deriveB', args=[]}
     where 
-        deriveB' :: [Expr] -> Either MyError Expr
+        deriveB' :: [Expr] -> Either NomadError Expr
         deriveB' [Abs [x] ex] = Right $ Abs [x] $ simplify $ deriveBy ex [x]
         deriveB' [Builtin b] = Right $ simplify $ deriveBy (Var (name b)) "x"
         deriveB' list = Left $ RuntimeError $ "cannot derive " ++ show list
@@ -148,7 +148,7 @@ makeTernary s f = Builtin $ B {name=s, narg=3, args=[], func=makeTernary' f}
 -- evaluate a Builtin with an argument.
 -- if the parameters are saturated, execute the builtin, otherwise just store
 -- the argument inside the builtin for later.
-evalBuiltin :: Builtin -> Expr -> Either MyError Expr
+evalBuiltin :: Builtin -> Expr -> Either NomadError Expr
 evalBuiltin b arg = do 
     if length (args b) == narg b - 1 then do
         -- apply the function

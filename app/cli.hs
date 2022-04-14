@@ -20,7 +20,7 @@ import Definitions
 import Environment
 
 -- Evaluates statements by evaluating expressions and managing definitions
-performAction :: Stmt -> MyException (EnvT IO) ()
+performAction :: Stmt -> NomadExceptT (EnvT IO) ()
 performAction (Expr ex) = do
     t <- getType (alphaRename ex)
     d <- evaluate ex
@@ -35,7 +35,7 @@ performAction (Def s ex) = lift $ do
     -- lift $ putStrLn "variable or function defined"
 
 -- :t command. Prints the type of an expression
-showType :: String -> MyException (EnvT IO) ()
+showType :: String -> NomadExceptT (EnvT IO) ()
 showType line = do
     stmt <- parse line
     case stmt of
@@ -59,7 +59,7 @@ printLines (x:xs) = do
 printLines [] = return ()
 
 -- Handles user input
-handleInput :: String -> MyException (EnvT IO) () 
+handleInput :: String -> NomadExceptT (EnvT IO) () 
 handleInput line = do
     if ":t " `isPrefixOf` line then do
         showType (drop 3 line)

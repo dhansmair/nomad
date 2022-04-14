@@ -6,23 +6,24 @@ be imported from everywhere without creating cyclic imports.
 -}
 module Definitions where
 
-import Debug.Trace
 import Data.List (intercalate)
+import Control.Monad.Error.Class
 import Control.Monad.Except
 import Control.Monad.Trans.State
 
 
-type EnvDef = (String, Expr, Either MyError Type, [String])
+type EnvDef = (String, Expr, Either NomadError Type, [String])
 type Env = [EnvDef]
 type EnvT = StateT Env
 
 -- TODO define?
 -- instance MonadError EnvT where
 
-type MyException = ExceptT MyError
+-- type NomadErrorCls m = MonadError NomadError m
+type NomadExceptT = ExceptT NomadError
 
 -- custom error type used throughout our program
-data MyError = BlankError String
+data NomadError = BlankError String
              | ParseError String
              | TypeError String
              | RuntimeError String
@@ -30,7 +31,7 @@ data MyError = BlankError String
              | UndefinedVariableError String
              | InvalidCommandError String
 
-instance Show MyError where
+instance Show NomadError where
     show (BlankError s)   = "Error: " ++ s
     show (ParseError s)   = "Parse error: " ++ s
     show (TypeError s)    = "Type error: " ++ s
@@ -83,7 +84,7 @@ data Op = Add | Sub | Mul | Div | Pow
 -- our simple language and builtin functions
 data Builtin = B { narg :: Int
                  , args :: [Expr]
-                 , func :: [Expr] -> Either MyError Expr
+                 , func :: [Expr] -> Either NomadError Expr
                  , name :: String
                  }
 instance Show Builtin where

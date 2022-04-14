@@ -13,7 +13,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Writer.Class
 import Control.Monad.Except
 import Control.Monad.Signatures ( Catch )
-import Definitions (MyError)
+-- import Definitions (NomadError)
 
 
 type Name     = String

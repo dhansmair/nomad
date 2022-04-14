@@ -29,11 +29,11 @@ module NomadParser( parse ) where
 import Lexer ( lexer, Token(..) )
 import Utils ( makeApp, makeAbs )
 import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
-import Definitions ( Stmt(..), Expr(..), Op(..), MyError(..), MyException )
+import Definitions ( Stmt(..), Expr(..), Op(..), NomadError(..), NomadExceptT )
 
 }
 %name calc
-%monad { Either MyError } { (>>=) } { return }
+%monad { Either NomadError } { (>>=) } { return }
 %tokentype { Token }
 %error { parseError }
 %token 
@@ -119,7 +119,7 @@ AtomN   : num                   { Num $1 }
 
 {
 
-parseError :: [Token] -> Either MyError a 
+parseError :: [Token] -> Either NomadError a 
 parseError tokenList = Left $ ParseError $ "Parse error at " ++ show tokenList
 
 data IdFunc = IdFunc String [String] deriving(Show)
@@ -136,14 +136,14 @@ makeDef (IdFunc s idList) ex = Def s (makeAbs idList ex)
 
 
 
-parse' :: String -> Either MyError Stmt
+parse' :: String -> Either NomadError Stmt
 parse' s = do
     res <- runExceptT $ parse s
     res
 
 
 
-parse :: (Monad m) => String -> MyException m Stmt
+parse :: (Monad m) => String -> NomadExceptT m Stmt
 parse s = do
     tokens <- lexer s
     let res = calc tokens

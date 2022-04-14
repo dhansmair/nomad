@@ -26,9 +26,10 @@
 
 module NomadParser( parse ) where
 
-import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
 import Lexer ( lexer, Token(..) )
-import Definitions ( Stmt(..), Expr(..), Op(..), MyError(..), MyException )
+import Utils ( makeApp, makeAbs )
+import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
+import Definitions ( Stmt(..), Expr(..), Op(..), NomadError(..), NomadExceptT )
 import qualified Data.Array as Happy_Data_Array
 import qualified Data.Bits as Bits
 import Control.Applicative(Applicative(..))
@@ -997,14 +998,14 @@ happyNewToken action sts stk (tk:tks) =
 happyError_ explist 35 tk tks = happyError' (tks, explist)
 happyError_ explist _ tk tks = happyError' ((tk:tks), explist)
 
-happyThen :: () => Either MyError a -> (a -> Either MyError b) -> Either MyError b
+happyThen :: () => Either NomadError a -> (a -> Either NomadError b) -> Either NomadError b
 happyThen = ((>>=))
-happyReturn :: () => a -> Either MyError a
+happyReturn :: () => a -> Either NomadError a
 happyReturn = (return)
 happyThen1 m k tks = ((>>=)) m (\a -> k a tks)
-happyReturn1 :: () => a -> b -> Either MyError a
+happyReturn1 :: () => a -> b -> Either NomadError a
 happyReturn1 = \a tks -> (return) a
-happyError' :: () => ([(Token)], [Prelude.String]) -> Either MyError a
+happyError' :: () => ([(Token)], [Prelude.String]) -> Either NomadError a
 happyError' = (\(tokens, _) -> parseError tokens)
 calc tks = happySomeParser where
  happySomeParser = happyThen (happyParse action_0 tks) (\x -> case x of {HappyAbsSyn4 z -> happyReturn z; _other -> notHappyAtAll })
@@ -1012,7 +1013,7 @@ calc tks = happySomeParser where
 happySeq = happyDontSeq
 
 
-parseError :: [Token] -> Either MyError a 
+parseError :: [Token] -> Either NomadError a 
 parseError tokenList = Left $ ParseError $ "Parse error at " ++ show tokenList
 
 data IdFunc = IdFunc String [String] deriving(Show)
@@ -1027,23 +1028,16 @@ idFunc2App (IdFunc i idList) = makeApp (Var i) (idlist2list idList)
 makeDef :: IdFunc -> Expr -> Stmt 
 makeDef (IdFunc s idList) ex = Def s (makeAbs idList ex)
 
-makeApp :: Expr -> [Expr] -> Expr
-makeApp ex [] = ex
-makeApp ex (x:xs) = makeApp (App ex x) xs 
-
-makeAbs :: [String] -> Expr -> Expr 
-makeAbs [] ex = ex
-makeAbs (x:xs) ex = Abs x (makeAbs xs ex)
 
 
-parse' :: String -> Either MyError Stmt
+parse' :: String -> Either NomadError Stmt
 parse' s = do
     res <- runExceptT $ parse s
     res
 
 
 
-parse :: (Monad m) => String -> MyException m Stmt
+parse :: (Monad m) => String -> NomadExceptT m Stmt
 parse s = do
     tokens <- lexer s
     let res = calc tokens
