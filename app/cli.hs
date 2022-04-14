@@ -26,10 +26,13 @@ performAction (Expr ex) = do
     d <- evaluate ex
     liftIO $ putStrLn $ showEx d ++ "\t:: " ++ show t
 performAction (Def s ex) = lift $ do
-    typ <- getTypeEither (alphaRename ex)
-    addDefnT (s,ex,typ)
+    t <- getTypeEither (alphaRename ex)
+    addDefnT (s, ex, t)
     reevalDepsT s
-    lift $ putStrLn "variable or function defined"
+    case t of
+      Right t' -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
+      Left err -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
+    -- lift $ putStrLn "variable or function defined"
 
 -- :t command. Prints the type of an expression
 showType :: String -> MyException (EnvT IO) ()

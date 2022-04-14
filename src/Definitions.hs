@@ -16,8 +16,8 @@ type EnvDef = (String, Expr, Either MyError Type, [String])
 type Env = [EnvDef]
 type EnvT = StateT Env
 
+-- TODO define?
 -- instance MonadError EnvT where
-
 
 
 type MyException = ExceptT MyError
@@ -88,7 +88,11 @@ data Builtin = B { narg :: Int
                  , name :: String
                  }
 instance Show Builtin where
-    show (B n args f name) = name
+    show (B _ [] _ name) = name
+    show (B n args _ name) 
+      | length args < n = let qs = intercalate "," (replicate (n - length args) "?")
+                           in name ++ "(" ++ pArgs args ++ ", " ++ qs ++ ")"
+      | length args == n = name ++ "(" ++ pArgs args ++ ")"
 
 
 
@@ -104,8 +108,7 @@ instance Eq Expr where
 
 -- showEx: special class for our Expressions. The showEx function is used to
 -- 'prettyprint' Expressions for the user, with the same Syntax as if it was 
--- typed in (outputs legal strings that could be parsed again with our grammar).
--- Used 'historically', because show was used for debugging.
+-- typed in (outputs legal strings that could be parsed again with our grammar. Used 'historically', because show was used for debugging.
 -- Probably we could replace ShowEx with Show now.
 class ShowEx a where
     showEx :: a -> String

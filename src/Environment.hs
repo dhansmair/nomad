@@ -5,7 +5,7 @@ The environment Env contains a list of environment definitions EnvDef, tuples co
 
 -}
 
-module Environment( Env, EnvT, runEnvT, getEnvT, addDefnT, getTypeDefsT, getDepGraphT, reevalDepsT, lookupValueT) where
+module Environment( Env, EnvT, runEnvT, getEnvT, addDefnT, getTypeDefsT, getDepGraphT, reevalDepsT, lookupVar) where
 
 import Debug.Trace
 
@@ -85,13 +85,18 @@ getTypeDefsT :: Monad m => EnvT m [(String, Type)]
 getTypeDefsT = getTypeDefs <$> get
 
 -- returns expression if a specific definition is part of the environment or an error if not
-lookupValueT :: Monad m => String -> EnvT m (Either MyError Expr)
-lookupValueT s = do
-    env <- get
-    let res = lookup s $ map (\(s, e, t, d) -> (s, e)) env
-    case res of
-        Nothing -> return $ Left $ UndefinedVariableError $ "Variable " ++ s ++ " undefined."
-        Just ex -> return $ Right ex
+-- lookupValueT :: Monad m => String -> EnvT m (Either MyError Expr)
+-- lookupValueT s = do
+--     env <- get
+--     let res = lookup s $ map (\(s, e, t, d) -> (s, e)) env
+--     case res of
+--         Nothing -> return $ Left $ UndefinedVariableError $ "Variable " ++ s ++ " undefined."
+--         Just ex -> return $ Right ex
+
+lookupVar :: Monad m => String -> EnvT m (Maybe Expr)
+lookupVar s = lookup s . map (\(s, e, t, d) -> (s, e)) <$> get
+
+
 
 ------------------------------ Utility ------------------------------
 

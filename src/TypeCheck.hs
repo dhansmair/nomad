@@ -1,4 +1,4 @@
--- {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-
 this Module exports the function 'getType', which determines the type for a 
 given expression.
@@ -124,11 +124,11 @@ addEquation eq = lift $ lift $ tell [eq]
     
 -- AxV / AxSK:
 -- type should be already determined -> Lookup in gamma
-getTypeM :: (Monad m) => Expr -> TypeInferenceT (MyException m) Type
+getTypeM :: (MonadError MyError m) => Expr -> TypeInferenceT m Type
 getTypeM (Var x) = do
     assumptions <- get
     case lookup x assumptions of
-        Nothing -> lift $ lift $ throwError $ UndefinedVariableError x
+        Nothing -> throwError $ UndefinedVariableError x
         Just t -> do
             case t of
                 -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.

@@ -1,3 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- {-# LANGUAGE MultiParamTypeClasses #-}
+-- {-# LANGUAGE FunctionalDependencies #-}
+
 module Frisch where
 
 import Control.Monad
@@ -5,19 +12,20 @@ import Control.Monad.Identity ( Identity, runIdentity )
 import Control.Monad.Trans.Class
 import Control.Monad.Except
 import Control.Monad.Signatures ( Catch )
+import Definitions (MyError)
 
 
 type Name     = String
 type NameList = [Name]
 
-newtype FrischT m a = FrischT (NameList -> m (a,NameList))
+newtype FrischT m a = FrischT (NameList -> m (a, NameList))
 
 type Frisch a = FrischT Identity a
 
 instance Monad m => Functor (FrischT m)  where
     fmap f (FrischT fn) = FrischT $ \nl -> do 
                                              (a,nl') <- fn nl 
-                                             return (f a,nl')
+                                             return (f a, nl')
 
 
 instance Monad m => Applicative (FrischT m) where
@@ -35,7 +43,7 @@ instance Monad m => Monad (FrischT m)  where
                                             case f a of 
                                                 FrischT fn' -> fn' nl'
 
-instance MonadTrans FrischT  where
+instance MonadTrans FrischT where
     -- lift :: Monad m => m a -> FrischT m a
     lift act = FrischT $ \nl -> do
                                  x <- act
@@ -52,11 +60,11 @@ runFrischT (FrischT f) nl = do (a, _) <- f nl
                                return a
 
 
--- liftCatch :: Catch e m a -> Catch e (FrischT r m) a
+-- liftCatch :: Catch e m a -> Catch e (FrischT m) a
 -- liftCatch f m h =
---     ReaderT $ \ r -> f (runReaderT m r) (\ e -> runReaderT (h e) r)
+--     FrischT $ \ a -> (f (runFrischT m a) (\e -> runFrischT (h e) a)
 
 -- -- instantiation of mtl classes
--- instance MonadError e m => MonadError e (FrischT m a) where
---     throwError = lift . throwError
---     catchError = liftCatch catchError
+instance (MonadError e m) => MonadError e (FrischT m) where
+    throwError = lift . throwError
+    -- catchError = liftCatch catchError

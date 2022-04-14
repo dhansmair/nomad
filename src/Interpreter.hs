@@ -26,14 +26,15 @@ import Definitions
 import Environment
 import Builtins ( evalBuiltin )
 import Utils ( exceptify, makeApp, op2app )
-import Frisch ( FrischT, Frisch, frisch, runFrischT )
+import Frisch
 
 
 evaluate :: Monad m => Expr -> MyException (EnvT m) Expr
 evaluate (Var s) = do
-    valOrErr <- lift $ lookupValueT s
-    val <- exceptify valOrErr
-    evaluate val
+    res <- lift $ lookupVar s
+    case res of
+        Nothing -> throwError $ UndefinedVariableError s 
+        Just ex -> evaluate ex
 evaluate (BinOp op a b) = evaluate $ op2app op a b
 evaluate (App s t) = do
     s' <- evaluate s
@@ -49,6 +50,8 @@ evaluate other = return other
 
 
 -- TODO ordering of arguments is not intuitive?
+-- betaReduce (App (Abs s ex) arg) -> s ex arg
+-- notation from the lecture: ex[arg/s]
 -- replaceWith obj -> matcher -> body
 replaceWith :: Expr -> String -> Expr -> Expr
 replaceWith arg s (Num n) = Num n
@@ -73,6 +76,8 @@ alphaRename ex = evalState (runFrischT (runReaderT (ren ex) []) names) []
     where 
         names = ['#':show i | i <- [1..]]
 
+        -- TODO why does this not work?
+        -- ren :: Expr -> ReaderT [(String, String)] (StateT [String] (Frisch String)) Expr
         ren :: Expr -> ReaderT [(String, String)] (FrischT (State [String])) Expr
         ren (Var x) = do
             renamings <- ask
@@ -99,34 +104,33 @@ alphaRename ex = evalState (runFrischT (runReaderT (ren ex) []) names) []
                 return $ Abs s ex'
         ren other = return other
 
+-- alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
+--     where
+--         names = map (\s -> 'x' : show s) (iterate (+1) 1)
 
-alphaRenameOld ex = evalState (alphaRenameM ex) ([], names)
-    where
-        names = map (\s -> 'x' : show s) (iterate (+1) 1)
-
-        -- alpha renaming using a state Monad which stores a list of renamings
-        -- (a,b) and a list of fresh variables
-        alphaRenameM :: Expr -> State ([(String, String)], [String]) Expr
-        alphaRenameM (Var v) = do
-            (renamings, freshvars) <- get
-            case lookup v renamings of
-                Nothing -> return $ Var v
-                Just v' -> return $ Var v'
-        alphaRenameM (Num n) = return $ Num n
-        alphaRenameM (BinOp op a b) = do
-            a' <- alphaRenameM a
-            b' <- alphaRenameM b
-            return $ BinOp op a' b'
-        alphaRenameM (App s t) = do
-            s' <- alphaRenameM s
-            t' <- alphaRenameM t
-            return $ App s' t'
-        alphaRenameM (Abs s ex) = do
-            (renamings, freshvars) <- get
-            let s' = head freshvars
-                restvars = tail freshvars
-            put ((s,s'):renamings, restvars)
-            ex' <- alphaRenameM ex
-            put (renamings, restvars) 
-            return $ Abs s' ex'
-        alphaRenameM (Builtin b) = return $ Builtin b
+--         -- alpha renaming using a state Monad which stores a list of renamings
+--         -- (a,b) and a list of fresh variables
+--         alphaRenameM :: Expr -> State ([(String, String)], [String]) Expr
+--         alphaRenameM (Var v) = do
+--             (renamings, freshvars) <- get
+--             case lookup v renamings of
+--                 Nothing -> return $ Var v
+--                 Just v' -> return $ Var v'
+--         alphaRenameM (Num n) = return $ Num n
+--         alphaRenameM (BinOp op a b) = do
+--             a' <- alphaRenameM a
+--             b' <- alphaRenameM b
+--             return $ BinOp op a' b'
+--         alphaRenameM (App s t) = do
+--             s' <- alphaRenameM s
+--             t' <- alphaRenameM t
+--             return $ App s' t'
+--         alphaRenameM (Abs s ex) = do
+--             (renamings, freshvars) <- get
+--             let s' = head freshvars
+--                 restvars = tail freshvars
+--             put ((s,s'):renamings, restvars)
+--             ex' <- alphaRenameM ex
+--             put (renamings, restvars) 
+--             return $ Abs s' ex'
+--         alphaRenameM (Builtin b) = return $ Builtin b
