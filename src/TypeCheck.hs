@@ -32,6 +32,7 @@ module TypeCheck ( getType
 
 
 import Control.Monad
+import Control.Monad.Writer.Class ( MonadWriter )
 import Control.Monad.State.Class ( MonadState )
 import Control.Monad.Except
 import Control.Monad.Trans.Except
@@ -183,7 +184,7 @@ substituteTypeVars t = evalStateT (subst t) []
         subst (TArr l r) = do
             l' <- subst l
             r' <- subst r
-            return $ l' @-> r'
+            return $ TArr l' r'
 
 -- helper function that replaces type variables with easier to read ones,
 -- i.e. replaces a1, a2, ... an 

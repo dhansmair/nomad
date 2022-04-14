@@ -10,6 +10,7 @@ module Frisch where
 import Control.Monad
 import Control.Monad.Identity ( Identity, runIdentity )
 import Control.Monad.Trans.Class
+import Control.Monad.Writer.Class
 import Control.Monad.Except
 import Control.Monad.Signatures ( Catch )
 import Definitions (MyError)
@@ -68,3 +69,9 @@ runFrischT (FrischT f) nl = do (a, _) <- f nl
 instance (MonadError e m) => MonadError e (FrischT m) where
     throwError = lift . throwError
     -- catchError = liftCatch catchError
+    --
+instance MonadWriter w m => MonadWriter w (FrischT m) where
+    writer = lift . writer
+    tell   = lift . tell
+    -- listen = mapReaderT listen
+    -- pass   = mapReaderT pass

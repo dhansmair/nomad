@@ -19,7 +19,6 @@ type EnvT = StateT Env
 -- TODO define?
 -- instance MonadError EnvT where
 
-
 type MyException = ExceptT MyError
 
 -- custom error type used throughout our program
