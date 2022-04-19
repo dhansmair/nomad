@@ -33,8 +33,10 @@ library
       Lexer
       NomadParser
       Simplification
+      TryRule
       TypeCheck
       Unification
+      Unification2
       Utils
   other-modules:
       Paths_nomad

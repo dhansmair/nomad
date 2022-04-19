@@ -43,7 +43,7 @@ import Data.List ( intercalate )
 
 import Definitions
 import Utils ( makeApp, op2app )
-import Unification ( unify, calcUnifier )
+import Unification2 ( unify )
 import Frisch
 
 type TypeAssumption = (String, Type)
