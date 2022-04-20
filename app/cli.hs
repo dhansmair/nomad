@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Trans.Except
 import Data.List
+import Data.Char (isSpace)
 
 import Interpreter ( evaluate, alphaRename )
 import NomadParser ( parse )
@@ -18,6 +19,14 @@ import Builtins (stdEnv)
 import TypeCheck ( getType, getTypeEither )
 import Definitions
 import Environment
+
+type Command = String -> NomadExceptT (EnvT IO) ()
+
+commands :: [(String, Command, Bool)]
+commands = [ ("t", showType, True)
+           , ("env", printEnv, False)
+           ]
+
 
 -- Evaluates statements by evaluating expressions and managing definitions
 performAction :: Stmt -> NomadExceptT (EnvT IO) ()
@@ -32,10 +41,9 @@ performAction (Def s ex) = lift $ do
     case t of
       Right t' -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
       Left err -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
-    -- lift $ putStrLn "variable or function defined"
 
 -- :t command. Prints the type of an expression
-showType :: String -> NomadExceptT (EnvT IO) ()
+showType :: Command
 showType line = do
     stmt <- parse line
     case stmt of
@@ -43,35 +51,46 @@ showType line = do
             t <- getType (alphaRename ex)
             liftIO $ putStr "type: "
             liftIO $ print t
-        _ -> throwE $ BlankError $ "\"" ++ line ++ "\" is not an expression"
+        _ -> throwError $ BlankError $ "\"" ++ line ++ "\" is not an expression"
 
 -- :env command. Prints the Environment.
-printEnv :: EnvT IO ()
-printEnv = do
+printEnv :: Command
+printEnv _ = lift $ do
     env <- getEnvT
-    let lines = env
-    lift $ printLines lines
+    lift $ printLines env
+    where 
+        printLines (x:xs) = do 
+            print x
+            printLines xs
+        printLines [] = return ()
 
--- helper to print lists
-printLines (x:xs) = do 
-    print x
-    printLines xs
-printLines [] = return ()
 
--- Handles user input
+isEmptyString :: String -> Bool
+isEmptyString "" = True
+isEmptyString s = all isSpace s
+
+
 handleInput :: String -> NomadExceptT (EnvT IO) () 
+
+-- handle commands, starting with ':'
+handleInput (':':line) = do
+    let result = find (\(s, _, _) -> s `isPrefixOf` line) commands
+    case result of
+        Nothing -> do
+            throwError $ InvalidCommandError $ "command \":" ++ line ++ "\" does not exist"
+        Just (prefix, command, hasArgs) -> do
+            let line' = dropWhile isSpace $ drop (length prefix) line
+
+            if hasArgs && isEmptyString line' 
+                then throwError $ InvalidCommandError $ "command \":" ++ prefix ++ "\" requires an argument"
+            else if not hasArgs && not (isEmptyString line') 
+                then throwError $ InvalidCommandError $ "command \":" ++ prefix ++ "\" requires no arguments"
+            else
+                command line'
+-- if input does not start with :, try to parse it directly
 handleInput line = do
-    if ":t " `isPrefixOf` line then do
-        showType (drop 3 line)
-    else if ":t" == line then do
-        throwE $ InvalidCommandError ":t needs an expression as an argument"
-    else if ":env" `isPrefixOf` line then do
-        lift printEnv
-    else if ":" `isPrefixOf` line then do
-        throwE (InvalidCommandError $ "command \"" ++ line ++ "\" does not exist")
-    else do
-        stmt <- parse line
-        performAction stmt
+    stmt <- parse line
+    performAction stmt
 
 -- Main loop of the cli app. Receives and delegates user input and restarts itself.
 loop :: InputT (EnvT IO) ()
@@ -81,7 +100,8 @@ loop = do
         Nothing -> return ()
         Just ":q" -> return ()
         Just input -> do
-            r <- lift $ runExceptT $ handleInput input
+            let input' = dropWhile isSpace input
+            r <- lift $ runExceptT $ handleInput input'
             case r of 
                 Left err -> do
                     liftIO $ print err

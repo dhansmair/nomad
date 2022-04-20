@@ -32,6 +32,21 @@ checkAll f err eqs =
 -- use case for simplification
 ------------------------------------------------------
 -- TODO this needs yet to be elaborated
+-- same as in unification, one problem is that rules usually apply to a small 
+-- part of a. How do I map those functions and in the same time track whether
+-- something has changed in the big picture?
+-- would it make sense to mitschleifen a state monad and store the modification
+-- status inside the state? Only if it could be hidden well in the code...
+-- like a simple one-line function call "setModified" or similar.
+-- Otherwise the code gets complicated. 
+-- also viele kleine subfunktionen, die über pattern matching aufgerufen werden,
+-- und gleichzeitig soll getracked werden, ob etwas geupdated wurde oder nicht.
+{-
+
+tryAddition (Var "x") (Var "x") -> Mul 2 (Var x)
+tryAddition (Num x) (Num y) -> Num x + y
+tryAddition (Var "x") (Mul n (Var "x")) -> Mul (n+1) (Var "x")
+-}
 
 ------------------------------------------------------
 -- use case for unification

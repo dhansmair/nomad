@@ -12,7 +12,7 @@ import Control.Monad.Except
 import Control.Monad.Trans.State
 
 
-type EnvDef = (String, Expr, Either NomadError Type, [String])
+type EnvDef = (VarId, Expr, Either NomadError Type, [VarId])
 type Env = [EnvDef]
 type EnvT = StateT Env
 
@@ -41,13 +41,16 @@ instance Show NomadError where
     show (InvalidCommandError s) = "Invalid command: " ++ s
 
 
+type TypeId = String
+type VarId = String
+
 -- TypeEquation is used in TypeCheck.hs and Unification.hs
 type TypeEquation = (Type, Type)
 
 -- Type: the type an expression can have. 
 -- Features num, polymorphic type variables and abstractions.
 data Type = TNum 
-          | TVar String 
+          | TVar TypeId 
           | TArr Type Type
     deriving(Eq)
 
@@ -62,18 +65,17 @@ instance Show Type where
 -- Stmt and Expr are the two fundamental data declarations to which the user
 -- input is parsed.
 --
-type Id = String
 --
 --
-data Stmt = Def Id Expr
+data Stmt = Def VarId Expr
           | Expr Expr
           deriving(Show)
 
 data Expr = Num Double
-          | Var Id
+          | Var VarId
           | BinOp Op Expr Expr
           | App Expr Expr 
-          | Abs Id Expr
+          | Abs VarId Expr
           | Builtin Builtin 
           deriving(Show)
 
@@ -85,7 +87,7 @@ data Op = Add | Sub | Mul | Div | Pow
 data Builtin = B { narg :: Int
                  , args :: [Expr]
                  , func :: [Expr] -> Either NomadError Expr
-                 , name :: String
+                 , name :: VarId
                  }
 instance Show Builtin where
     show (B _ [] _ name) = name
