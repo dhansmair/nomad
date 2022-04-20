@@ -36,7 +36,7 @@ instance Show NomadError where
     show (TypeError s)    = "Type error: " ++ s
     show (RuntimeError s) = "Runtime error: " ++ s
     show (CyclicDependencyError s) = "Cyclic dependency error: " ++ s
-    show (UndefinedVariableError s) = "Undefined variable error: " ++ s
+    show (UndefinedVariableError s) = "Error: Undefined variable " ++ s
     show (InvalidCommandError s) = "Invalid command: " ++ s
 
 

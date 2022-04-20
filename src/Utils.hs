@@ -13,7 +13,7 @@ tComb (x:y:xs) = TArr x (tComb (y:xs))
 makeApp :: Expr -> [Expr] -> Expr
 makeApp = foldl App
 
-makeAbs :: [String] -> Expr -> Expr 
+makeAbs :: [VarId] -> Expr -> Expr 
 makeAbs params ex = foldr Abs ex params
 
 -- helper function which unwraps an either value or throws an exception
@@ -22,14 +22,14 @@ exceptify eith = case eith of
     Right ex -> return ex
     Left err -> throwE err
 
-op2str :: Op -> String
+op2str :: Op -> VarId
 op2str Add = "#add"
 op2str Sub = "#sub"
 op2str Mul = "#mul"
 op2str Div = "#div"
 op2str Pow = "#pow"
 
-str2op :: String -> Op
+str2op :: VarId -> Op
 str2op "#add" = Add
 str2op "#sub" = Sub
 str2op "#mul" = Mul

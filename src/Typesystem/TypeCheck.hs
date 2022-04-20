@@ -46,7 +46,7 @@ import Utils ( makeApp, op2app )
 import Typesystem.Unification2 ( unify )
 import Frisch
 
-type TypeAssumption = (String, Type)
+type TypeAssumption = (TypeId, Type)
 
 -- custom monad TypeInferenceT:
 -- StateT [TypeAssumption]      initial assumptions (gamma)
@@ -77,7 +77,7 @@ getType ex = do
     (t, equations) <- runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names 
 
     case unify t equations of 
-        (Just t2) -> return $ substituteSaneNames t2
+        Just t2 -> return $ substituteSaneNames t2
         Nothing -> throwError $ TypeError "unification failed"
 
 
@@ -129,13 +129,11 @@ getTypeM :: (MonadError NomadError m) => Expr -> TypeInferenceT m Type
 getTypeM (Var x) = do
     assumptions <- get
     case lookup x assumptions of
+        -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
+        Just (TArr l r) -> lift $ substituteTypeVars (TArr l r)
+        -- AxV: otherwise we have AxV, just return the type
+        Just tvar -> return tvar
         Nothing -> throwError $ UndefinedVariableError x
-        Just t -> do
-            case t of
-                -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
-                TArr _ _ -> lift $ substituteTypeVars t
-                -- AxV: otherwise we have AxV, just return the type
-                _ -> return t
 
 -- AxK: we only have one type of constructor, which has the type num
 getTypeM (Num x) = return TNum
@@ -171,7 +169,7 @@ getTypeM (Builtin _) = error "trying to check type of builtin, this should not h
 substituteTypeVars :: (Monad m) => Type -> FrischT m Type
 substituteTypeVars t = evalStateT (subst t) []
     where
-        subst :: (Monad m) => Type -> StateT [(String, String)] (FrischT m) Type
+        subst :: (Monad m) => Type -> StateT [(TypeId, TypeId)] (FrischT m) Type
         subst TNum = return TNum
         subst (TVar s) = do
             replacings <- get
