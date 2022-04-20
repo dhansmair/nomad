@@ -12,15 +12,12 @@ import Control.Monad.Except
 import Control.Monad.Trans.State
 
 
+type TypeId = String
+type VarId = String
+
 type EnvDef = (VarId, Expr, Either NomadError Type, [VarId])
 type Env = [EnvDef]
 type EnvT = StateT Env
-
--- TODO define?
--- instance MonadError EnvT where
-
--- type NomadErrorCls m = MonadError NomadError m
-type NomadExceptT = ExceptT NomadError
 
 -- custom error type used throughout our program
 data NomadError = BlankError String
@@ -30,6 +27,8 @@ data NomadError = BlankError String
              | CyclicDependencyError String
              | UndefinedVariableError String
              | InvalidCommandError String
+
+type NomadExceptT = ExceptT NomadError
 
 instance Show NomadError where
     show (BlankError s)   = "Error: " ++ s
@@ -41,8 +40,6 @@ instance Show NomadError where
     show (InvalidCommandError s) = "Invalid command: " ++ s
 
 
-type TypeId = String
-type VarId = String
 
 -- TypeEquation is used in TypeCheck.hs and Unification.hs
 type TypeEquation = (Type, Type)
@@ -64,9 +61,6 @@ instance Show Type where
 
 -- Stmt and Expr are the two fundamental data declarations to which the user
 -- input is parsed.
---
---
---
 data Stmt = Def VarId Expr
           | Expr Expr
           deriving(Show)
@@ -96,6 +90,8 @@ instance Show Builtin where
                            in name ++ "(" ++ pArgs args ++ ", " ++ qs ++ ")"
       | length args == n = name ++ "(" ++ pArgs args ++ ")"
 
+instance Eq Builtin where
+    (==) (B n args f name) (B n2 args2 f2 name2) = name == name2 && args == args2
 
 
 instance Eq Expr where
@@ -104,7 +100,7 @@ instance Eq Expr where
     (==) (BinOp op1 a1 b1) (BinOp op2 a2 b2) = op1 == op2 && a1 == a2 && b1 == b2
     (==) (App ex1 l1) (App ex2 l2) = ex1 == ex2 && l1 == l2
     (==) (Abs l1 ex1) (Abs l2 ex2) = False
-    (==) (Builtin b1) (Builtin b2) = name b1 == name b2
+    (==) (Builtin b1) (Builtin b2) = b1 == b2
     (==) _ _ = False
     
 
@@ -133,7 +129,7 @@ instance ShowEx Expr where
         let (args, ex') = squeezeAbs (Abs x ex)
          in '\\' : intercalate ", " args ++ " -> " ++ showEx ex'
 
-    showEx (Builtin b) = name b
+    showEx (Builtin b) = show b
 
 instance ShowEx Op where
     showEx Add = "+"
@@ -144,9 +140,12 @@ instance ShowEx Op where
 
 
 -- helper function for showEx
+-- cannot put these in Utils since that would require a circular dependency
 embrace :: String -> String
 embrace s = "(" ++ s ++ ")"
 
+-- only add parentheses to expressions if mathematically required, 
+-- e.g. addition inside a multiplication 
 embraceIfLower :: Op -> Expr -> String
 embraceIfLower op1 (BinOp op2 a b)
     | op1 > op2 = embrace $ showEx $ BinOp op2 a b
