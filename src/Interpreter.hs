@@ -40,7 +40,8 @@ evaluate (App s t) = do
     case s' of 
         Builtin b -> do
             t' <- evaluate t
-            exceptify $ evalBuiltin b t'
+            ex <- exceptify $ evalBuiltin b t'
+            evaluate ex
         Abs param ex -> do
             t' <- evaluate t
             evaluate $ replaceWith t' param ex
