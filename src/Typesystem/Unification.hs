@@ -3,9 +3,7 @@ this module provides the functions unify and calcUnifier.
 -}
 
 
-module Unification ( unify 
-                   , calcUnifier
-                   ) where
+module Typesystem.Unification ( unify ) where
 
 
 import Control.Monad ( (>=>) )

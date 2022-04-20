@@ -14,9 +14,9 @@ import Data.List
 import Data.Char (isSpace)
 
 import Interpreter ( evaluate, alphaRename )
-import NomadParser ( parse )
-import Builtins (stdEnv)
-import TypeCheck ( getType, getTypeEither )
+import Parser.NomadParser ( parse )
+import Builtins.Builtins (stdEnv)
+import Typesystem.TypeCheck ( getType, getTypeEither )
 import Definitions
 import Environment
 

@@ -1,4 +1,4 @@
-module Unification2 ( unify ) where
+module Typesystem.Unification2 ( unify ) where
 
 import Data.List ( find )
 import Data.Maybe ( fromMaybe )

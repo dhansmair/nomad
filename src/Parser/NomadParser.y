@@ -24,11 +24,12 @@
 
 
 
-module NomadParser( parse ) where
+module Parser.NomadParser( parse ) where
 
-import Lexer ( lexer, Token(..) )
-import Utils ( makeApp, makeAbs )
 import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
+
+import Parser.Lexer ( lexer, Token(..) )
+import Utils ( makeApp, makeAbs )
 import Definitions ( Stmt(..), Expr(..), Op(..), NomadError(..), NomadExceptT )
 
 }

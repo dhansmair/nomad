@@ -1,4 +1,4 @@
-module Simplification where
+module Builtins.Simplification where
 
 import Definitions
 

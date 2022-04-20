@@ -26,9 +26,9 @@ Disclaimer:
 
 -}
 
-module TypeCheck ( getType
-                 , getTypePure
-                 , getTypeEither ) where
+module Typesystem.TypeCheck ( getType
+                            , getTypePure
+                            , getTypeEither ) where
 
 
 import Control.Monad
@@ -43,7 +43,7 @@ import Data.List ( intercalate )
 
 import Definitions
 import Utils ( makeApp, op2app )
-import Unification2 ( unify )
+import Typesystem.Unification2 ( unify )
 import Frisch
 
 type TypeAssumption = (String, Type)

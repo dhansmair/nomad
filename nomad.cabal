@@ -25,18 +25,19 @@ source-repository head
 
 library
   exposed-modules:
-      Builtins
+      Builtins.Builtins
+      Builtins.Derivation
+      Builtins.Simplification
       Definitions
       Environment
       Frisch
       Interpreter
-      Lexer
-      NomadParser
-      Simplification
+      Parser.Lexer
+      Parser.NomadParser
       TryRule
-      TypeCheck
-      Unification
-      Unification2
+      Typesystem.TypeCheck
+      Typesystem.Unification
+      Typesystem.Unification2
       Utils
   other-modules:
       Paths_nomad

@@ -15,7 +15,6 @@ evaluate of a Var fetches the value from EnvT, and then evaluates the value.
 
 module Interpreter( evaluate, alphaRename ) where
 
-import Debug.Trace
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Trans.Reader
@@ -24,7 +23,7 @@ import Control.Monad.Identity
 import Control.Monad.Trans.State
 import Definitions 
 import Environment
-import Builtins ( evalBuiltin )
+import Builtins.Builtins ( evalBuiltin )
 import Utils ( exceptify, makeApp, op2app )
 import Frisch
 
@@ -96,7 +95,7 @@ alphaRename ex = evalState (runFrischT (runReaderT (ren ex) []) names) []
             visited <- lift $ lift get
             if s `elem` visited then do
                 s' <- lift frisch
-                ex' <- local ((s, s'):) (trace ("frisch: " ++ show s') (ren ex))
+                ex' <- local ((s, s'):) (ren ex)
                 return $ Abs s' ex'
             else do
                 lift $ lift $ put (s:visited)

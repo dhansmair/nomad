@@ -4,7 +4,7 @@ Contains the lexer function and the 'Token' data type.
 lexer function is inspired by the example in the happy parser documentation.
 -}
 
-module Lexer ( lexer, Token(..) ) where
+module Parser.Lexer ( lexer, Token(..) ) where
 
 
 import Control.Monad.Except ( throwError )

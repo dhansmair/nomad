@@ -15,7 +15,7 @@ import Control.Monad.Trans.State
 import Data.List (intercalate, sort, union, (\\))
 import Data.Maybe (catMaybes, mapMaybe)
 import Definitions
-import TypeCheck ( getTypePure )
+import Typesystem.TypeCheck ( getTypePure )
 
 
 -- Reach is the maximum distance from one node (eg. a) to another (eg. b) on a dependency graph
