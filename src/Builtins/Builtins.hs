@@ -12,11 +12,7 @@ import Builtins.Simplification (simplify)
 import Builtins.Derivation
 
 
-type BuiltinFunc = [Expr] -> Either NomadError Expr
-
 nanMsg = Left $ RuntimeError "builtin function requires input of type Num"
-numArgMsg = Left $ RuntimeError "wrong number of arguments to [builtin]"
-
 
 -- create the environment,
 -- including standard functions etc
@@ -75,55 +71,42 @@ maxB = makeBinary "max" max
 rootB = makeAbs ["n", "x"] (BinOp Pow (Var "x") (BinOp Div (Num 1) (Var "n")))
 sqrtB = makeAbs ["x"] (BinOp Pow (Var "x") (Num 0.5))
 
-deriveB = Builtin $ B {name="derive", narg=1, func=deriveB', args=[]}
+deriveB = Builtin $ Unary "derive" deriveB'
     where 
-        deriveB' :: [Expr] -> Either NomadError Expr
-        deriveB' [Abs [x] ex] = Right $ Abs [x] $ simplify $ deriveBy ex [x]
-        deriveB' [Builtin b] = Right $ simplify $ deriveBy (Var (name b)) "x"
+        deriveB' :: Expr -> Either NomadError Expr
+        deriveB' (Abs [x] ex) = Right $ Abs [x] $ simplify $ deriveBy ex [x]
+        deriveB' (Builtin b) = Right $ simplify $ deriveBy (Var (getName b)) "x"
         deriveB' list = Left $ RuntimeError $ "cannot derive " ++ show list
 
-
-
+        getName :: Builtin -> String
+        getName (Unary s _)   = s
+        getName (Binary s _)  = s
+        getName (Ternary s _) = s
 
 -- some helper functions
 --
 makeUnary :: String -> (Double -> Double) -> Expr
-makeUnary s f = Builtin $ B {name=s, narg=1, args=[], func=makeUnary' f}
-    where
-        makeUnary' :: (Double -> Double) -> BuiltinFunc
-        makeUnary' f [Num x] = Right $ Num (f x)
-        makeUnary' f [_] = nanMsg
-        makeUnary' f _ = numArgMsg
+makeUnary s f = Builtin $ Unary s (helper f)
+    where helper :: (Double -> Double) -> (Expr -> Either NomadError Expr)
+          helper f (Num x) = Right $ Num (f x)
+          helper f _ = nanMsg
 
 makeBinary :: String -> (Double -> Double -> Double) -> Expr
-makeBinary s f = Builtin $ B {name=s, narg=2, args=[], func=makeBinary' f}
-    where
-        makeBinary' :: (Double -> Double -> Double) -> BuiltinFunc
-        makeBinary' f [Num a, Num b] = Right $ Num (f a b) 
-        makeBinary' f [_, _] = nanMsg
-        makeBinary' f _ = numArgMsg
+makeBinary s f = Builtin $ Binary s (helper f)
+    where helper :: (Double -> Double -> Double) -> (Expr -> Expr -> Either NomadError Expr)
+          helper f (Num x) (Num y) = Right $ Num (f x y)
+          helper f _ _ = nanMsg
 
 makeTernary :: String -> (Double -> Double -> Double -> Double) -> Expr
-makeTernary s f = Builtin $ B {name=s, narg=3, args=[], func=makeTernary' f}
-    where
-        makeTernary' :: (Double -> Double -> Double -> Double) -> BuiltinFunc
-        makeTernary' f [Num a, Num b, Num c] = Right $ Num (f a b c) 
-        makeTernary' f [_, _, _] = nanMsg
-        makeTernary' f _ = numArgMsg
-
+makeTernary s f = Builtin $ Ternary s (helper f)
+    where helper :: (Double -> Double -> Double -> Double) -> (Expr -> Expr -> Expr -> Either NomadError Expr)
+          helper f (Num x) (Num y) (Num z) = Right $ Num (f x y z)
+          helper f _ _ _ = nanMsg
 
 -- evaluate a Builtin with an argument.
 -- if the parameters are saturated, execute the builtin, otherwise just store
 -- the argument inside the builtin for later.
 evalBuiltin :: Builtin -> Expr -> Either NomadError Expr
-evalBuiltin b arg = do 
-    if length (args b) == narg b - 1 then do
-        -- apply the function
-        let args' = reverse (arg : args b)  
-         in func b args'
-
-    else if length (args b) < narg b then do
-        -- return a new builtin, but add the 
-        return $ Builtin $ b {args=arg:args b}
-    else do
-        error "error in builtins, should not happen"
+evalBuiltin (Unary s f)   arg = f arg
+evalBuiltin (Binary s f)  arg = Right $ Builtin $ Unary s (f arg)
+evalBuiltin (Ternary s f) arg = Right $ Builtin $ Binary s (f arg)

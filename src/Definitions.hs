@@ -70,29 +70,8 @@ data Expr = Num Double
           | BinOp Op Expr Expr
           | App Expr Expr 
           | Abs VarId Expr
-          | Builtin Builtin 
+          | Builtin Builtin
           deriving(Show)
-
-data Op = Add | Sub | Mul | Div | Pow
-    deriving(Show, Eq, Ord)
-
--- Buitin is a special type for Expr, which is used to provide a bridge between
--- our simple language and builtin functions
-data Builtin = B { narg :: Int
-                 , args :: [Expr]
-                 , func :: [Expr] -> Either NomadError Expr
-                 , name :: VarId
-                 }
-instance Show Builtin where
-    show (B _ [] _ name) = name
-    show (B n args _ name) 
-      | length args < n = let qs = intercalate "," (replicate (n - length args) "?")
-                           in name ++ "(" ++ pArgs args ++ ", " ++ qs ++ ")"
-      | length args == n = name ++ "(" ++ pArgs args ++ ")"
-
-instance Eq Builtin where
-    (==) (B n args f name) (B n2 args2 f2 name2) = name == name2 && args == args2
-
 
 instance Eq Expr where
     (==) (Num a) (Num b) = a == b
@@ -102,6 +81,27 @@ instance Eq Expr where
     (==) (Abs l1 ex1) (Abs l2 ex2) = False
     (==) (Builtin b1) (Builtin b2) = b1 == b2
     (==) _ _ = False
+
+data Op = Add | Sub | Mul | Div | Pow
+    deriving(Show, Eq, Ord)
+
+-- Buitin is a special type for Expr, which is used to provide a bridge between
+-- our simple language and builtin functions
+data Builtin = Unary   VarId (Expr -> Either NomadError Expr)
+             | Binary  VarId (Expr -> Expr -> Either NomadError Expr)
+             | Ternary VarId (Expr -> Expr -> Expr -> Either NomadError Expr)
+
+instance Show Builtin where
+    show (Unary s _)   = s
+    show (Binary s _)  = s
+    show (Ternary s _) = s
+
+instance Eq Builtin where
+    (==) (Unary s1 _)   (Unary s2 _)   = s1 == s2
+    (==) (Binary s1 _)  (Binary s2 _)  = s1 == s2
+    (==) (Ternary s1 _) (Ternary s2 _) = s1 == s2
+    (==) _ _ = False
+
     
 
 -- showEx: special class for our Expressions. The showEx function is used to
