@@ -33,14 +33,14 @@ performAction :: Stmt -> NomadExceptT (EnvT IO) ()
 performAction (Expr ex) = do
     t <- getType (alphaRename ex)
     d <- evaluate ex
-    liftIO $ putStrLn $ showEx d ++ "\t:: " ++ show t
+    liftIO $ putStrLn $ "  " ++ showEx d ++ "\t:: " ++ show t
 performAction (Def s ex) = lift $ do
     t <- getTypeEither (alphaRename ex)
     addDefnT (s, ex, t)
     reevalDepsT s
     case t of
-      Right t' -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
-      Left err -> lift $ putStrLn $ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
+      Right t' -> lift $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
+      Left err -> lift $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
 
 -- :t command. Prints the type of an expression
 showType :: Command

@@ -63,7 +63,7 @@ instance Show Type where
 -- input is parsed.
 data Stmt = Def VarId Expr
           | Expr Expr
-          deriving(Show)
+          deriving(Show, Eq)
 
 data Expr = Num Double
           | Var VarId
@@ -71,16 +71,7 @@ data Expr = Num Double
           | App Expr Expr 
           | Abs VarId Expr
           | Builtin Builtin
-          deriving(Show)
-
-instance Eq Expr where
-    (==) (Num a) (Num b) = a == b
-    (==) (Var x) (Var y) = x == y 
-    (==) (BinOp op1 a1 b1) (BinOp op2 a2 b2) = op1 == op2 && a1 == a2 && b1 == b2
-    (==) (App ex1 l1) (App ex2 l2) = ex1 == ex2 && l1 == l2
-    (==) (Abs l1 ex1) (Abs l2 ex2) = False
-    (==) (Builtin b1) (Builtin b2) = b1 == b2
-    (==) _ _ = False
+          deriving(Show, Eq)
 
 data Op = Add | Sub | Mul | Div | Pow
     deriving(Show, Eq, Ord)
