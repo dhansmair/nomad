@@ -3,26 +3,24 @@ this module provides the functions unify and calcUnifier.
 -}
 
 
-module Typesystem.Unification ( unify ) where
+module Typesystem.Unification ( mostGeneralUnifier ) where
 
 
 import Control.Monad ( (>=>) )
 import Data.List (intercalate, find)
 import Data.Maybe (fromMaybe)
 
-import Definitions ( Type(..)
-                   , TypeEquation 
-                   )
+import Definitions ( Type(..) , TypeEquation )
 
 
 -- |takes a type t and a list of type equations eqs. 
 -- The type equations are unified,
 -- and the most general unifier of t (sigma(t)) is returned on success.
 -- returns Nothing if the unification fails.
-unify :: Type -> [TypeEquation] -> Maybe Type
-unify t eqs = do
-    unifier <- calcUnifier eqs
-    return $ replaceVariables t unifier
+mostGeneralUnifier :: Type -> [TypeEquation] -> Maybe Type
+mostGeneralUnifier t eqs = do
+    eqs' <- unify eqs
+    return $ replaceVariables t eqs'
       where
         replaceVariables :: Type -> [TypeEquation] -> Type
         replaceVariables TNum _  = TNum
@@ -40,8 +38,8 @@ unify t eqs = do
 -- The function works by repeatedly doing 'elim', 'failCheck' and 'occursCheck'
 -- and then trying to perform one rule of ['orient', 'solve', 'decompose'].
 -- If no more rule can be applied, the list of remaining equations is returned.
-calcUnifier :: [TypeEquation] -> Maybe [TypeEquation]
-calcUnifier eqs = do
+unify :: [TypeEquation] -> Maybe [TypeEquation]
+unify eqs = do
 
     -- simplify equations
     -- let eqs1 = map (\(x,y) -> (simplifyType x, simplifyType y)) eqs
@@ -53,15 +51,15 @@ calcUnifier eqs = do
 
     if any canOrient eqs3
         -- orient rule
-        then calcUnifier $ orient eqs3
+        then unify $ orient eqs3
     else if any canDecomp eqs3
         -- decompose rule
-        then calcUnifier $ decompose eqs3
+        then unify $ decompose eqs3
     else do
         -- solve rule
         case findSolver eqs3 of
             Nothing -> Just eqs3
-            (Just eq) -> calcUnifier $ solve eqs3 eq
+            (Just eq) -> unify $ solve eqs3 eq
     
 
 

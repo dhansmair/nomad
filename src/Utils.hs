@@ -2,7 +2,7 @@ module Utils where
 
 import Definitions
 
-import Control.Monad.Trans.Except ( throwE ) 
+-- import Control.Monad.Trans.Except ( throwE ) 
 
 
 tComb :: [Type] -> Type
@@ -17,10 +17,10 @@ makeAbs :: [VarId] -> Expr -> Expr
 makeAbs params ex = foldr Abs ex params
 
 -- helper function which unwraps an either value or throws an exception
-exceptify :: Monad m => Either NomadError Expr -> NomadExceptT m Expr
-exceptify eith = case eith of
-    Right ex -> return ex
-    Left err -> throwE err
+-- exceptify :: Monad m => Either NomadError Expr -> NomadExceptT m Expr
+-- exceptify eith = case eith of
+--     Right ex -> return ex
+--     Left err -> throwE err
 
 op2str :: Op -> VarId
 op2str Add = "#add"

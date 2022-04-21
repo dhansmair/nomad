@@ -38,6 +38,7 @@ library
       Typesystem.TypeCheck
       Typesystem.Unification
       Typesystem.Unification2
+      Typesystem.Unification3
       Utils
   other-modules:
       Paths_nomad

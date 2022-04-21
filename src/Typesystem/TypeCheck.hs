@@ -26,9 +26,7 @@ Disclaimer:
 
 -}
 
-module Typesystem.TypeCheck ( getType
-                            , getTypePure
-                            , getTypeEither ) where
+module Typesystem.TypeCheck ( getType, getTypeEither, getTypeExcept ) where
 
 
 import Control.Monad
@@ -43,7 +41,7 @@ import Data.List ( intercalate )
 
 import Definitions
 import Utils ( makeApp, op2app )
-import Typesystem.Unification2 ( unify )
+import Typesystem.Unification3
 import Frisch
 
 type TypeAssumption = (TypeId, Type)
@@ -57,7 +55,12 @@ type TypeInferenceT m = StateT [TypeAssumption]
                       ( WriterT [TypeEquation] 
                         m))
 
-names = ['a': show s | s <- [1..]]
+
+runTypeInferenceT :: Monad m => TypeInferenceT m a -> [TypeAssumption] -> m (a, [TypeEquation])
+runTypeInferenceT tInfT gamma = do
+    runWriterT $ runFrischT (evalStateT tInfT gamma) names
+        where names = ['a': show s | s <- [1..]]
+
 
 (@->) :: Type -> Type -> Type
 a @-> b = TArr a b
@@ -71,34 +74,19 @@ a @-> b = TArr a b
 -- or Right type in case of success.
 --
 -- getType internally calls the monadic function getTypeM
-getType :: (Monad m) => Expr -> NomadExceptT (EnvT m) Type
-getType ex = do
-    gamma0 <- lift getInitialAssumptions
-    (t, equations) <- runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names 
 
-    case unify t equations of 
+getType :: Expr -> [TypeAssumption] -> Either NomadError Type
+getType ex gamma = runExcept $ getTypeExcept ex gamma
+
+getTypeExcept :: Monad m => Expr -> [TypeAssumption] -> NomadExceptT m Type
+getTypeExcept ex gamma = do
+    (t, equations) <- runTypeInferenceT (getTypeM ex) gamma
+    case mostGeneralUnifier t equations of 
         Just t2 -> return $ substituteSaneNames t2
         Nothing -> throwError $ TypeError "unification failed"
 
-
--- this is a non-Monadic version of getType. 
--- It is required in some functions that do not know the EnvT monad
-getTypePure :: Expr -> [TypeAssumption] -> Either NomadError Type
-getTypePure ex gamma0 = do
-    res <- runExceptT $ runWriterT $ runFrischT (evalStateT (getTypeM ex) gamma0) names
-
-    case res of
-        Left err -> Left err
-        Right (t, equations) -> 
-            case unify t equations of 
-                Just t' -> Right $ substituteSaneNames t'
-                Nothing -> Left $ TypeError "unification failed"
-
-
--- another version of getType that returns an Either instead of throwing 
--- an exception
-getTypeEither :: (Monad m) => Expr -> (EnvT m) (Either NomadError Type)
-getTypeEither ex = runExceptT (getType ex)
+getTypeEither :: Monad m => Expr -> (EnvT m) (Either NomadError Type)
+getTypeEither ex = getType ex <$> getInitialAssumptions
 
 
 -- helper function to extract the initial type assumptions from EnvT
@@ -125,7 +113,7 @@ addEquation eq = lift $ lift $ tell [eq]
     
 -- AxV / AxSK:
 -- type should be already determined -> Lookup in gamma
-getTypeM :: (MonadError NomadError m) => Expr -> TypeInferenceT m Type
+getTypeM :: MonadError NomadError m => Expr -> TypeInferenceT m Type
 getTypeM (Var x) = do
     assumptions <- get
     case lookup x assumptions of

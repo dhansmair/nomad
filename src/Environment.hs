@@ -15,7 +15,7 @@ import Control.Monad.Trans.State
 import Data.List (intercalate, sort, union, (\\))
 import Data.Maybe (catMaybes, mapMaybe)
 import Definitions
-import Typesystem.TypeCheck ( getTypePure )
+import Typesystem.TypeCheck ( getType )
 
 
 -- Reach is the maximum distance from one node (eg. a) to another (eg. b) on a dependency graph
@@ -155,7 +155,7 @@ reevalGraph dg [] = dg
 -- reevaluates node if has the correct reach
 reevalNode :: Env -> Int -> DepGraphNode -> DepGraphNode
 reevalNode env l dgn
-    | reach dgn == ReachAt l = dgn{typ = getTypePure (expr dgn) (getTypeDefs env)}
+    | reach dgn == ReachAt l = dgn{typ = getType (expr dgn) (getTypeDefs env)}
     | otherwise = dgn
 
 -- converts the dependencyGraph to an environment

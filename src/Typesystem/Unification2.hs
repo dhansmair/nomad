@@ -1,4 +1,4 @@
-module Typesystem.Unification2 ( unify ) where
+module Typesystem.Unification2 ( mostGeneralUnifier ) where
 
 import Data.List ( find )
 import Data.Maybe ( fromMaybe )
@@ -14,11 +14,11 @@ import TryRule
 -- The type equations are unified,
 -- and the most general unifier of t (sigma(t)) is returned on success.
 -- returns Nothing if the unification fails.
-unify :: Type -> [TypeEquation] -> Maybe Type
-unify t eqs =
-    case calcUnifier eqs of
+mostGeneralUnifier :: Type -> [TypeEquation] -> Maybe Type
+mostGeneralUnifier t eqs =
+    case unify eqs of
         Left _ -> Nothing
-        Right unifier -> return $ replaceVariables t unifier
+        Right eqs' -> return $ replaceVariables t eqs'
     where
         replaceVariables :: Type -> [TypeEquation] -> Type
         replaceVariables TNum _  = TNum
@@ -36,12 +36,12 @@ unify t eqs =
 -- The function works by repeatedly doing 'elim', 'failCheck' and 'occursCheck'
 -- and then trying to perform one rule of ['orient', 'solve', 'decompose'].
 -- If no more rule can be applied, the list of remaining equations is returned.
-calcUnifier :: [TypeEquation] -> Either NomadError [TypeEquation]
-calcUnifier = applyUntilConvergence [ elim
-                                    , checkAll failCheck (TypeError "error")
-                                    , checkAll occursCheck (TypeError "error")
-                                    , orient, decompose, solve
-                                    ]
+unify :: [TypeEquation] -> Either NomadError [TypeEquation]
+unify = applyUntilConvergence [ elim
+                              , checkAll failCheck (TypeError "error")
+                              , checkAll occursCheck (TypeError "error")
+                              , orient, decompose, solve
+                              ]
 
 failCheck :: TypeEquation -> Bool
 failCheck (TArr _ _, TNum) = True

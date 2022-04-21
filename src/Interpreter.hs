@@ -24,7 +24,7 @@ import Control.Monad.Trans.State
 import Definitions 
 import Environment
 import Builtins.Builtins ( evalBuiltin )
-import Utils ( exceptify, makeApp, op2app )
+import Utils ( makeApp, op2app )
 import Frisch
 
 
@@ -40,7 +40,7 @@ evaluate (App s t) = do
     case s' of 
         Builtin b -> do
             t' <- evaluate t
-            ex <- exceptify $ evalBuiltin b t'
+            ex <- liftEither $ evalBuiltin b t'
             evaluate ex
         Abs param ex -> do
             t' <- evaluate t

@@ -16,7 +16,7 @@ import Data.Char (isSpace)
 import Interpreter ( evaluate, alphaRename )
 import Parser.NomadParser ( parse )
 import Builtins.Builtins (stdEnv)
-import Typesystem.TypeCheck ( getType, getTypeEither )
+import Typesystem.TypeCheck ( getType, getTypeEither, getTypeExcept )
 import Definitions
 import Environment
 
@@ -28,19 +28,26 @@ commands = [ ("t", showType, True)
            ]
 
 
+getTypeT :: Monad m => Expr -> NomadExceptT (EnvT m) Type
+getTypeT ex = do
+    gamma <- lift getTypeDefsT
+    getTypeExcept ex gamma
+
+
 -- Evaluates statements by evaluating expressions and managing definitions
 performAction :: Stmt -> NomadExceptT (EnvT IO) ()
 performAction (Expr ex) = do
-    t <- getType (alphaRename ex)
+    t <- getTypeT (alphaRename ex)
     d <- evaluate ex
     liftIO $ putStrLn $ "  " ++ showEx d ++ "\t:: " ++ show t
 performAction (Def s ex) = lift $ do
+    -- assumptions <- getTypeDefsT
     t <- getTypeEither (alphaRename ex)
     addDefnT (s, ex, t)
     reevalDepsT s
     case t of
-      Right t' -> lift $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
-      Left err -> lift $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
+      Right t' -> liftIO $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: " ++ show t'
+      Left err -> liftIO $ putStrLn $ "  " ++ s ++ " = " ++ showEx ex ++ "\t:: [" ++ show err ++ "]"
 
 -- :t command. Prints the type of an expression
 showType :: Command
@@ -48,7 +55,7 @@ showType line = do
     stmt <- parse line
     case stmt of
         (Expr ex) -> do
-            t <- getType (alphaRename ex)
+            t <- getTypeT (alphaRename ex)
             liftIO $ putStr "type: "
             liftIO $ print t
         _ -> throwError $ BlankError $ "\"" ++ line ++ "\" is not an expression"
