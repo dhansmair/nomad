@@ -26,9 +26,10 @@
 
 module Parser.NomadParser( parse ) where
 
-import Lexer ( lexer, Token(..) )
-import Utils ( makeApp, makeAbs )
 import Control.Monad.Trans.Except( ExceptT, throwE, runExceptT )
+
+import Parser.Lexer ( lexer, Token(..) )
+import Utils ( makeApp, makeAbs )
 import Definitions ( Stmt(..), Expr(..), Op(..), NomadError(..), NomadExceptT )
 import qualified Data.Array as Happy_Data_Array
 import qualified Data.Bits as Bits
