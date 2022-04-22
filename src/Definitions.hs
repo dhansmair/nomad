@@ -27,6 +27,7 @@ data NomadError = BlankError String
              | CyclicDependencyError String
              | UndefinedVariableError String
              | InvalidCommandError String
+             deriving(Eq)
 
 type NomadExceptT = ExceptT NomadError
 

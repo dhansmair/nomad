@@ -26,7 +26,7 @@ Disclaimer:
 
 -}
 
-module Typesystem.TypeCheck ( getType, getTypeEither, getTypeExcept ) where
+module Typesystem.TypeInference ( getType, getTypeExcept ) where
 
 
 import Control.Monad
@@ -85,16 +85,14 @@ getTypeExcept ex gamma = do
         Just t2 -> return $ substituteSaneNames t2
         Nothing -> throwError $ TypeError "unification failed"
 
-getTypeEither :: Monad m => Expr -> (EnvT m) (Either NomadError Type)
-getTypeEither ex = getType ex <$> getInitialAssumptions
-
-
+-- getTypeEither :: Monad m => Expr -> (EnvT m) (Either NomadError Type)
+-- getTypeEither ex = getType ex <$> getInitialAssumptions
 -- helper function to extract the initial type assumptions from EnvT
-getInitialAssumptions :: (Monad m) => EnvT m [TypeAssumption]
-getInitialAssumptions = do mapMaybe helper <$> get
-    where
-        helper (s, _, Right t, _) = Just (s, t)
-        helper (_, _, Left _, _) = Nothing
+-- getInitialAssumptions :: (Monad m) => EnvT m [TypeAssumption]
+-- getInitialAssumptions = do mapMaybe helper <$> get
+--     where
+--         helper (s, _, Right t, _) = Just (s, t)
+--         helper (_, _, Left _, _) = Nothing
 
 -- helper functions to easier access and modify the state monad
 -- get new type variable with a fresh name

@@ -7,7 +7,7 @@ The environment Env contains a list of environment definitions EnvDef, tuples co
 
 module Environment( Env, EnvT, runEnvT, getEnvT, addDefnT, getTypeDefsT, getDepGraphT, reevalDepsT, lookupVar) where
 
-import Debug.Trace
+-- import Debug.Trace
 
 import Control.Monad
 import Control.Monad.Except
@@ -15,7 +15,7 @@ import Control.Monad.Trans.State
 import Data.List (intercalate, sort, union, (\\))
 import Data.Maybe (catMaybes, mapMaybe)
 import Definitions
-import Typesystem.TypeCheck ( getType )
+import Typesystem.TypeInference ( getType )
 
 
 -- Reach is the maximum distance from one node (eg. a) to another (eg. b) on a dependency graph

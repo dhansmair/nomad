@@ -25,6 +25,9 @@ dependencies:
 - mtl
 - transformers
 - haskeline
+- tasty
+- tasty-hunit
+
 
 library:
   source-dirs: src
@@ -58,3 +61,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - nomad
+    - tasty
+    - tasty-hunit
