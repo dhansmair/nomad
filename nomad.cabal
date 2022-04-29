@@ -36,6 +36,7 @@ library
       Parser.NomadParser
       TryRule
       Typesystem.TypeInference
+      Typesystem.TypeInferenceMonad
       Typesystem.Unification
       Typesystem.Unification2
       Typesystem.Unification3
