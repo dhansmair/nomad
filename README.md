@@ -1,5 +1,5 @@
 # Nomad
-A CLI calculator application, written in Haskell.
+A CLI calculator application written in Haskell.
 This project is a continued version of https://github.com/dhansmair/nomad-calculator (university project).
 It's a learning project that explores functional programming in Haskell, but also other topics such as parsing, the lambda calculus and basic type inference.
 
