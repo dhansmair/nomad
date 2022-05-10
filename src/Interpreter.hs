@@ -37,13 +37,12 @@ evaluate (Var s) = do
 evaluate (BinOp op a b) = evaluate $ op2app op a b
 evaluate (App s t) = do
     s' <- evaluate s
+    t' <- evaluate t
     case s' of 
         Builtin b -> do
-            t' <- evaluate t
             ex <- liftEither $ evalBuiltin b t'
             evaluate ex
         Abs param ex -> do
-            t' <- evaluate t
             evaluate $ replaceWith t' param ex
         _ -> error "Left side of App is not an Abs, should have been prevented by the type system. It is a bug in Nomad"
 evaluate other = return other

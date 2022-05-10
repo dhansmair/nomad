@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-
 this Module exports the function 'getType', which determines the type for a 
-given expression.
+given expression. 'getTypeExcept' does the same but returns an ExceptT Monad 
+instead of an Either.
 -}
 module Typesystem.TypeInference ( getType, getTypeExcept ) where
 
@@ -20,11 +21,11 @@ import Frisch
 -- ex is the expression we want to type
 -- gamma is the initial set of type assumptions, obtained from Env.
 getType :: Expr -> [TypeAssumption] -> Either NomadError Type
-getType ex gamma = runExcept $ getTypeExcept ex gamma
+getType ex assumptions = runExcept $ getTypeExcept ex assumptions
 
 getTypeExcept :: Monad m => Expr -> [TypeAssumption] -> NomadExceptT m Type
-getTypeExcept ex gamma = do
-    (t, equations) <- runTypeInferenceT (inferType ex) gamma
+getTypeExcept ex assumptions = do
+    (t, equations) <- runTypeInferenceT (inferType ex) assumptions
     case mostGeneralUnifier t equations of 
         Just t2 -> return $ substituteSaneNames t2
         Nothing -> throwError $ TypeError "unification failed"
@@ -42,7 +43,7 @@ inferType (Var x) = do
     case lookup x assumptions of
         Nothing -> throwError $ UndefinedVariableError x
         -- AxSK: if a variable is bound to an abstraction, it is a supercombinator.
-        Just (TArr l r) -> lift $ substituteTypeVars (TArr l r)
+        Just (TArr l r) -> lift $ substituteTypeVars $ TArr l r
         -- AxV: otherwise we have AxV, just return the type
         Just tvar -> return tvar
 
