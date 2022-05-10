@@ -15,6 +15,7 @@ Features that would be nice (but will probably not come):
 - automatic simplification of terms and functions
 - boolean type
 - loading / executing code from file
+- useful type error messages
 
 
 ## Setup
