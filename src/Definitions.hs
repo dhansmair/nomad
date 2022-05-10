@@ -40,8 +40,6 @@ instance Show NomadError where
     show (UndefinedVariableError s) = "Error: Undefined variable " ++ s
     show (InvalidCommandError s) = "Invalid command: " ++ s
 
-
-
 -- TypeEquation is used in TypeCheck.hs and Unification.hs
 type TypeEquation = (Type, Type)
 
